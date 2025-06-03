@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>API Service</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 40px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+        }
+        .info {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 20px 0;
+        }
+        .status {
+            color: #28a745;
+            font-weight: bold;
+        }
+        .endpoints {
+            background: #e9ecef;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 20px 0;
+        }
+        .endpoint {
+            margin: 10px 0;
+            padding: 10px;
+            background: white;
+            border-radius: 3px;
+            border-left: 4px solid #007bff;
+        }
+        .method {
+            font-weight: bold;
+            color: #007bff;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚀 API Service</h1>
+        <div class="info">
+            <p><strong>Status:</strong> <span class="status">Running</span></p>
+            <p><strong>Version:</strong> v1.0</p>
+            <p><strong>Time:</strong> <span id="time"></span></p>
+        </div>
+        <h3>Available Endpoints:</h3>
+        <div class="endpoints">
+            <div class="endpoint">
+                <span class="method">GET</span> /health
+                <p>Health check endpoint</p>
+            </div>
+            <div class="endpoint">
+                <span class="method">GET</span> /status
+                <p>Service status information</p>
+            </div>
+            <div class="endpoint">
+                <span class="method">POST</span> /api/data
+                <p>Data processing endpoint</p>
+            </div>
+        </div>
+        <p>This is an example API service used to demonstrate the API proxy functionality of Nginx Manager.</p>
+    </div>
+    
+    <script>
+        function updateTime() {
+            document.getElementById('time').textContent = new Date().toLocaleString('en-US');
+        }
+        updateTime();
+        setInterval(updateTime, 1000);
+    </script>
+</body>
+</html> 

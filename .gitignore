@@ -1,0 +1,80 @@
+# Log files
+logs/
+*.log
+
+# SSL certificates and private keys
+certs/
+*.pem
+*.key
+*.crt
+*.cer
+*.csr
+
+# Generated nginx configuration files
+nginx-conf/
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+
+# Virtual environment
+venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+.venv/
+.test-venv/
+
+# Test environment and reports
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.nox/
+coverage.xml
+*.cover
+.hypothesis/
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# System files
+.DS_Store
+Thumbs.db
+
+# Docker related
+docker-compose.override.yml
+
+# Temporary files
+*.tmp
+*.temp
+tmp/
+temp/
+
+# Backup files
+*.bak
+*.backup
+
+# Sensitive information in configuration files
+config/production.yml
+config/secrets.yml
+
+# acme.sh related
+.acme.sh/
+
+# Temporary files generated during test runs
+.docker-test/
+.test-data/ 

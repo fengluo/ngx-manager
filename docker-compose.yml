@@ -1,0 +1,66 @@
+version: '3.8'
+
+services:
+  nginx-manager:
+    build: .
+    container_name: nginx-manager
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      # Configuration file mapping
+      - ./config:/app/config:ro
+      # SSL certificate storage
+      - ./certs:/app/certs
+      # Log files
+      - ./logs:/app/logs
+      # Generated Nginx configuration files (Important: for viewing and debugging)
+      - ./nginx-conf:/etc/nginx/conf.d
+      # Static files directory (optional)
+      - ./www:/var/www:ro
+    environment:
+      - TZ=Asia/Shanghai
+      - NGINX_RELOAD_SIGNAL=HUP
+      - ACME_EMAIL=admin@example.com
+      - ACME_CA_SERVER=letsencrypt
+      - DEBUG=false
+    networks:
+      - nginx-network
+    depends_on:
+      - backend-service
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Example backend service
+  backend-service:
+    image: nginx:alpine
+    container_name: backend
+    networks:
+      - nginx-network
+    volumes:
+      - ./examples/backend:/usr/share/nginx/html:ro
+    environment:
+      - TZ=Asia/Shanghai
+
+  # Example API service
+  api-service:
+    image: nginx:alpine
+    container_name: api-service
+    networks:
+      - nginx-network
+    volumes:
+      - ./examples/api:/usr/share/nginx/html:ro
+    environment:
+      - TZ=Asia/Shanghai
+
+networks:
+  nginx-network:
+    driver: bridge
+
+volumes:
+  certs-data:
+  logs-data: 
