@@ -10,15 +10,15 @@
 
 推荐使用虚拟环境来隔离测试依赖：
 
-```bash
+   ```bash
 # 1. 创建虚拟环境
 python3 -m venv .venv
-
+   
 # 2. 激活虚拟环境
 source .venv/bin/activate  # Linux/macOS
-# 或
+   # 或
 .venv\Scripts\activate     # Windows
-
+   
 # 3. 安装开发依赖（包含测试工具）
 pip install -r requirements-dev.txt
 
@@ -39,9 +39,9 @@ pytest tests/
 
 如果需要在完全隔离的环境中测试：
 
-```bash
-# 使用Docker运行测试
-docker run --rm -v $(pwd):/app -w /app python:3.9 \
+   ```bash
+   # 使用Docker运行测试
+   docker run --rm -v $(pwd):/app -w /app python:3.9 \
   bash -c "pip install -r requirements-dev.txt && pytest tests/"
 ```
 

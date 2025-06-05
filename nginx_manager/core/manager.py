@@ -64,7 +64,8 @@ class NginxManager:
                         break
                 except FileNotFoundError:
                     continue
-            else:
+            
+            if status['status'] == 'unknown':
                 status['status'] = 'stopped'
             
             # Test nginx configuration

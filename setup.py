@@ -29,7 +29,7 @@ setup(
     long_description_content_type="text/markdown",
     author="Nginx Manager Team",
     author_email="admin@example.com",
-    url="https://github.com/yourusername/ngx-manager",
+    url="https://github.com/fengluo/ngx-manager",
     packages=find_packages(),
     include_package_data=True,
     package_data={
@@ -64,8 +64,8 @@ setup(
     ],
     keywords="nginx ssl certificate management acme letsencrypt",
     project_urls={
-        "Bug Reports": "https://github.com/yourusername/ngx-manager/issues",
-        "Source": "https://github.com/yourusername/ngx-manager",
-        "Documentation": "https://github.com/yourusername/ngx-manager/docs",
+        "Bug Reports": "https://github.com/fengluo/ngx-manager/issues",
+        "Source": "https://github.com/fengluo/ngx-manager",
+        "Documentation": "https://github.com/fengluo/ngx-manager/docs",
     },
 ) 

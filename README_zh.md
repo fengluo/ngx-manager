@@ -424,7 +424,7 @@ docker-compose restart
 
 如果您遇到问题或有建议，请：
 
-1. 查看 [Issues](https://github.com/your-username/nginx-manager/issues) 页面
+1. 查看 [Issues](https://github.com/fengluo/ngx-manager/issues) 页面
 2. 创建新的 Issue 描述问题
 3. 联系维护者：your-email@example.com
 

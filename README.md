@@ -5,7 +5,7 @@
 [![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Tests](https://img.shields.io/badge/Tests-Passing-brightgreen.svg)](run_tests.py)
 
-A Docker-based Nginx automation management and configuration tool that supports virtual host configuration, automatic SSL certificate application and management.
+A Nginx automation management and configuration tool that supports virtual host configuration, automatic SSL certificate application and management.
 
 [🇨🇳 中文文档](README_zh.md)
 
@@ -502,7 +502,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 If you encounter issues or have suggestions:
 
-1. Check the [Issues](https://github.com/your-username/ngx-manager/issues) page
+1. Check the [Issues](https://github.com/fengluo/ngx-manager/issues) page
 2. Create a new Issue describing the problem
 3. Contact maintainer: your-email@example.com
 

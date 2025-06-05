@@ -433,7 +433,7 @@ git commit -m "your changes"
 如果您在使用过程中遇到问题，请：
 
 1. 查看本文档的故障排除部分
-2. 检查 [GitHub Issues](https://github.com/yourusername/nginx-manager/issues)
+2. 检查 [GitHub Issues](https://github.com/fengluo/ngx-manager/issues)
 3. 提交新的Issue描述问题
 
 ## 许可证
