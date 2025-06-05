@@ -1,5 +1,5 @@
 """
-测试配置生成完整流程的集成测试
+Integration tests for configuration generation workflow
 """
 
 import pytest
@@ -8,493 +8,353 @@ import shutil
 from pathlib import Path
 import yaml
 import os
-from unittest.mock import patch
+from unittest.mock import patch, Mock
+
+from nginx_manager.templates.generator import ConfigGenerator
+from nginx_manager.core.manager import NginxManager
+from nginx_manager.ssl.manager import SSLManager
+from nginx_manager.config.settings import Settings
+
 
 class TestConfigGenerationWorkflow:
-    """测试配置生成工作流程"""
+    """Test complete configuration generation workflow"""
     
     @pytest.fixture
     def test_workspace(self):
-        """创建测试工作空间"""
+        """Create test workspace"""
         workspace = Path(tempfile.mkdtemp())
         
-        # 创建目录结构
+        # Create directory structure
         (workspace / "config").mkdir()
-        (workspace / "templates").mkdir()
-        (workspace / "output").mkdir()
+        (workspace / "nginx").mkdir()
+        (workspace / "certs").mkdir()
         (workspace / "logs").mkdir()
+        (workspace / "www").mkdir()
         
         yield workspace
         
-        # 清理
+        # Cleanup
         shutil.rmtree(workspace, ignore_errors=True)
 
     @pytest.fixture
-    def vhosts_config_file(self, test_workspace):
-        """创建虚拟主机配置文件"""
-        vhosts_config = [
+    def site_configs(self, test_workspace):
+        """Create site configuration files"""
+        configs = [
             {
-                "name": "static-site",
-                "domains": ["www.example.com", "example.com"],
+                "domain": "example.com",
                 "type": "static",
-                "root": "/var/www/html",
+                "ssl": True,
+                "www_dir": "/var/www/example.com"
+            },
+            {
+                "domain": "api.example.com", 
+                "type": "proxy",
+                "backend": "http://localhost:3000",
                 "ssl": True
             },
             {
-                "name": "api-service",
-                "domains": ["api.example.com"],
-                "type": "proxy",
-                "upstream": "http://backend:8080",
-                "ssl": True,
-                "locations": [
-                    {
-                        "path": "/health",
-                        "type": "static",
-                        "root": "/var/www/health"
-                    },
-                    {
-                        "path": "/api/v1",
-                        "type": "proxy",
-                        "upstream": "http://backend-v1:8080"
-                    }
-                ]
+                "domain": "test.local",
+                "type": "static", 
+                "ssl": False,
+                "www_dir": "/var/www/test"
             }
         ]
         
-        config_file = test_workspace / "config" / "vhosts.yml"
-        with open(config_file, 'w', encoding='utf-8') as f:
-            yaml.dump(vhosts_config, f, default_flow_style=False, allow_unicode=True)
-        
-        return config_file
+        return configs
 
     @pytest.fixture
-    def ssl_config_file(self, test_workspace):
-        """创建SSL配置文件"""
-        ssl_config = {
-            "ssl": {
-                "email": "admin@example.com",
-                "ca_server": "letsencrypt",
-                "key_length": 2048
-            },
-            "acme": {
-                "staging": True,
-                "force": False
-            }
-        }
-        
-        config_file = test_workspace / "config" / "ssl.yml"
-        with open(config_file, 'w', encoding='utf-8') as f:
-            yaml.dump(ssl_config, f, default_flow_style=False, allow_unicode=True)
-        
-        return config_file
+    def config_generator_with_workspace(self, test_workspace):
+        """Create config generator with test workspace"""
+        with patch('nginx_manager.config.settings.Settings') as mock_settings:
+            mock_settings_instance = Mock()
+            mock_settings_instance.ssl_certs_dir = test_workspace / "certs"
+            mock_settings_instance.logs_dir = test_workspace / "logs"
+            mock_settings_instance.www_dir = test_workspace / "www"
+            mock_settings_instance.nginx_config_dir = test_workspace / "nginx"
+            
+            generator = ConfigGenerator()
+            generator.settings = mock_settings_instance
+            return generator
 
-    @pytest.fixture
-    def nginx_template_file(self, test_workspace):
-        """创建nginx配置模板文件"""
-        template_content = """# Virtual Host: {{ vhost.name }}
-# Generated at: {{ generation_time }}
-# Domains: {{ vhost.domains | join(', ') }}
-
-{% if vhost.ssl %}
-# HTTP to HTTPS redirect
-server {
-    listen 80;
-    server_name {{ vhost.domains | join(' ') }};
-    return 301 https://$server_name$request_uri;
-}
-
-# HTTPS server
-server {
-    listen 443 ssl;
-    server_name {{ vhost.domains | join(' ') }};
-    
-    ssl_certificate /app/certs/{{ vhost.domains[0] }}/fullchain.cer;
-    ssl_certificate_key /app/certs/{{ vhost.domains[0] }}/{{ vhost.domains[0] }}.key;
-{% else %}
-# HTTP server
-server {
-    listen 80;
-    server_name {{ vhost.domains | join(' ') }};
-{% endif %}
-    
-    access_log /app/logs/{{ vhost.name }}-access.log;
-    error_log /app/logs/{{ vhost.name }}-error.log;
-    
-{% if vhost.locations %}
-    # Location-based configuration
-{% for location in vhost.locations %}
-    location {{ location.path }} {
-{% if location.type == 'proxy' %}
-        proxy_pass {{ location.upstream }};
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-{% elif location.type == 'static' %}
-        root {{ location.root }};
-        try_files $uri $uri/ =404;
-{% endif %}
-    }
-{% endfor %}
-{% else %}
-    # Simple configuration
-{% if vhost.type == 'proxy' %}
-    location / {
-        proxy_pass {{ vhost.upstream }};
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-    }
-{% elif vhost.type == 'static' %}
-    location / {
-        root {{ vhost.root }};
-        index index.html index.htm;
-        try_files $uri $uri/ =404;
-    }
-{% endif %}
-{% endif %}
-}"""
+    def test_complete_config_generation_workflow(self, test_workspace, site_configs, 
+                                               config_generator_with_workspace):
+        """Test complete configuration generation workflow"""
+        generator = config_generator_with_workspace
         
-        template_file = test_workspace / "templates" / "vhost.conf.j2"
-        with open(template_file, 'w', encoding='utf-8') as f:
-            f.write(template_content)
+        # Generate configurations for all sites
+        generated_configs = []
         
-        return template_file
-
-    def test_complete_config_generation_workflow(self, test_workspace, vhosts_config_file, 
-                                                ssl_config_file, nginx_template_file):
-        """测试完整的配置生成工作流程"""
-        # 模拟配置生成过程
-        from jinja2 import Template
-        
-        # 加载配置
-        with open(vhosts_config_file, 'r', encoding='utf-8') as f:
-            vhosts_data = yaml.safe_load(f)
-        
-        with open(ssl_config_file, 'r', encoding='utf-8') as f:
-            ssl_data = yaml.safe_load(f)
-        
-        with open(nginx_template_file, 'r', encoding='utf-8') as f:
-            template_content = f.read()
-        
-        # 验证配置加载成功
-        assert isinstance(vhosts_data, list)
-        assert len(vhosts_data) == 2
-        assert isinstance(ssl_data, dict)
-        assert "ssl" in ssl_data
-        
-        # 生成nginx配置
-        template = Template(template_content)
-        output_dir = test_workspace / "output"
-        
-        for vhost in vhosts_data:
-            # 渲染配置
-            rendered_config = template.render(
-                vhost=vhost,
-                generation_time="2024-12-19 10:00:00"
+        for site_config in site_configs:
+            config = generator.generate_site_config(
+                domain=site_config['domain'],
+                backend=site_config.get('backend'),
+                ssl=site_config['ssl']
             )
             
-            # 保存配置文件
-            config_file = output_dir / f"{vhost['name']}.conf"
-            with open(config_file, 'w', encoding='utf-8') as f:
-                f.write(rendered_config)
+            # Verify configuration was generated
+            assert config is not None
+            assert site_config['domain'] in config
             
-            # 验证配置文件生成
-            assert config_file.exists()
-            assert config_file.stat().st_size > 0
+            if site_config['ssl']:
+                assert 'ssl_certificate' in config
+                assert 'listen 443 ssl' in config
+                assert 'listen 80' in config  # HTTP redirect
+            else:
+                assert 'ssl_certificate' not in config
+                assert 'listen 80' in config
+                assert 'listen 443' not in config
             
-            # 验证配置内容
-            config_content = config_file.read_text(encoding='utf-8')
-            assert vhost['name'] in config_content
-            for domain in vhost['domains']:
-                assert domain in config_content
+            if site_config['type'] == 'proxy':
+                assert 'proxy_pass' in config
+                assert site_config['backend'] in config
+            else:
+                assert 'root /var/www/' in config
+                assert 'try_files $uri $uri/ =404' in config
             
-            if vhost.get('ssl'):
-                assert 'ssl_certificate' in config_content
-                assert '443 ssl' in config_content
-            
-            if vhost.get('type') == 'proxy':
-                assert 'proxy_pass' in config_content
-                assert vhost['upstream'] in config_content
-            elif vhost.get('type') == 'static':
-                assert 'root' in config_content
-                assert vhost['root'] in config_content
-
-    def test_config_validation_workflow(self, vhosts_config_file, ssl_config_file):
-        """测试配置验证工作流程"""
-        # 加载并验证vhosts配置
-        with open(vhosts_config_file, 'r', encoding='utf-8') as f:
-            vhosts_data = yaml.safe_load(f)
+            generated_configs.append(config)
         
-        for vhost in vhosts_data:
-            # 验证必要字段
-            assert 'name' in vhost
-            assert 'domains' in vhost
-            assert isinstance(vhost['domains'], list)
-            assert len(vhost['domains']) > 0
+        # Verify all configurations were generated
+        assert len(generated_configs) == len(site_configs)
+        
+        # Test template availability
+        templates = generator.list_available_templates()
+        assert len(templates) >= 4  # Should have all 4 base templates
+        assert 'proxy_ssl.conf.j2' in templates
+        assert 'static_ssl.conf.j2' in templates
+        assert 'proxy_http.conf.j2' in templates
+        assert 'static_http.conf.j2' in templates
+
+    def test_nginx_manager_integration(self, test_workspace, site_configs):
+        """Test nginx manager integration with config generation"""
+        with patch('nginx_manager.ssl.manager.SSLManager._find_acme_sh') as mock_acme:
+            mock_acme.return_value = Path('/usr/local/bin/acme.sh')
             
-            # 验证类型特定字段
-            if vhost.get('type') == 'static':
-                assert 'root' in vhost
-            elif vhost.get('type') == 'proxy':
-                assert 'upstream' in vhost
-            
-            # 验证locations配置
-            if 'locations' in vhost:
-                for location in vhost['locations']:
-                    assert 'path' in location
-                    assert 'type' in location
+            with patch('nginx_manager.config.settings.Settings') as mock_settings_class:
+                mock_settings = Mock()
+                mock_settings.nginx_config_dir = test_workspace / "nginx"
+                mock_settings.ssl_certs_dir = test_workspace / "certs"
+                mock_settings.logs_dir = test_workspace / "logs"
+                mock_settings.www_dir = test_workspace / "www"
+                mock_settings_class.return_value = mock_settings
+                
+                manager = NginxManager()
+                
+                # Test adding sites through manager
+                with patch('pathlib.Path.exists', return_value=False), \
+                     patch('builtins.open'), \
+                     patch('subprocess.run', return_value=Mock(returncode=0)), \
+                     patch.object(manager.ssl_manager, 'obtain_certificate', 
+                                 return_value={'success': True}):
                     
-                    if location['type'] == 'proxy':
-                        assert 'upstream' in location
-                    elif location['type'] == 'static':
-                        assert 'root' in location
-        
-        # 验证SSL配置
-        with open(ssl_config_file, 'r', encoding='utf-8') as f:
-            ssl_data = yaml.safe_load(f)
-        
-        assert 'ssl' in ssl_data
-        assert 'email' in ssl_data['ssl']
-        assert 'ca_server' in ssl_data['ssl']
+                    for site_config in site_configs:
+                        result = manager.add_site(
+                            site_config['domain'],
+                            site_config.get('backend'),
+                            ssl=site_config['ssl']
+                        )
+                        
+                        assert result['success'] is True
+                        assert result['domain'] == site_config['domain']
 
-    def test_error_handling_in_workflow(self, test_workspace):
-        """测试工作流程中的错误处理"""
-        # 测试缺少配置文件的情况
-        nonexistent_config = test_workspace / "config" / "nonexistent.yml"
-        
-        try:
-            with open(nonexistent_config, 'r') as f:
-                yaml.safe_load(f)
-            assert False, "Should have raised FileNotFoundError"
-        except FileNotFoundError:
-            pass  # 预期的异常
-        
-        # 测试无效YAML格式
-        invalid_yaml_file = test_workspace / "config" / "invalid.yml"
-        with open(invalid_yaml_file, 'w') as f:
-            f.write("invalid: yaml: content: [unclosed")
-        
-        try:
-            with open(invalid_yaml_file, 'r') as f:
-                yaml.safe_load(f)
-            assert False, "Should have raised YAML parsing error"
-        except yaml.YAMLError:
-            pass  # 预期的异常
-
-    def test_simplified_config_format(self, test_workspace):
-        """测试简化配置格式的处理"""
-        # 创建简化格式的配置（直接数组，不包含vhosts键）
-        simplified_config = [
-            {
-                "name": "simple-site",
-                "domains": ["simple.example.com"],
-                "type": "static",
-                "root": "/var/www/simple"
-            }
-        ]
-        
-        config_file = test_workspace / "config" / "simplified.yml"
-        with open(config_file, 'w', encoding='utf-8') as f:
-            yaml.dump(simplified_config, f, default_flow_style=False)
-        
-        # 加载并验证简化格式配置
-        with open(config_file, 'r', encoding='utf-8') as f:
-            data = yaml.safe_load(f)
-        
-        assert isinstance(data, list)
-        assert len(data) == 1
-        assert data[0]['name'] == 'simple-site'
-
-    def test_full_format_config(self, test_workspace):
-        """测试完整格式配置的处理"""
-        # 创建完整格式的配置（包含vhosts键）
-        full_config = {
-            "vhosts": [
-                {
-                    "name": "full-site",
-                    "domains": ["full.example.com"],
-                    "type": "static",
-                    "root": "/var/www/full"
-                }
-            ]
-        }
-        
-        config_file = test_workspace / "config" / "full.yml"
-        with open(config_file, 'w', encoding='utf-8') as f:
-            yaml.dump(full_config, f, default_flow_style=False)
-        
-        # 加载并验证完整格式配置
-        with open(config_file, 'r', encoding='utf-8') as f:
-            data = yaml.safe_load(f)
-        
-        assert isinstance(data, dict)
-        assert 'vhosts' in data
-        assert isinstance(data['vhosts'], list)
-        assert len(data['vhosts']) == 1
-        assert data['vhosts'][0]['name'] == 'full-site'
-
-class TestConfigReloading:
-    """测试配置重新加载功能"""
-    
-    @pytest.fixture
-    def config_workspace(self):
-        """配置工作空间"""
-        workspace = Path(tempfile.mkdtemp())
-        (workspace / "config").mkdir()
-        (workspace / "output").mkdir()
-        
-        yield workspace
-        
-        shutil.rmtree(workspace, ignore_errors=True)
-
-    def test_config_file_change_detection(self, config_workspace):
-        """测试配置文件变更检测"""
-        config_file = config_workspace / "config" / "vhosts.yml"
-        
-        # 创建初始配置
-        initial_config = [{"name": "initial", "domains": ["initial.com"], "type": "static", "root": "/var/www"}]
-        with open(config_file, 'w') as f:
-            yaml.dump(initial_config, f)
-        
-        initial_mtime = config_file.stat().st_mtime
-        
-        # 等待一小段时间确保时间戳不同
-        import time
-        time.sleep(0.1)
-        
-        # 修改配置文件
-        updated_config = [{"name": "updated", "domains": ["updated.com"], "type": "static", "root": "/var/www"}]
-        with open(config_file, 'w') as f:
-            yaml.dump(updated_config, f)
-        
-        updated_mtime = config_file.stat().st_mtime
-        
-        # 验证时间戳变更
-        assert updated_mtime > initial_mtime
-        
-        # 验证配置内容变更
-        with open(config_file, 'r') as f:
-            data = yaml.safe_load(f)
-        
-        assert data[0]['name'] == 'updated'
-        assert data[0]['domains'] == ['updated.com']
-
-    @patch('time.sleep')  # 加速测试
-    def test_config_monitoring_simulation(self, mock_sleep, config_workspace):
-        """模拟配置文件监控"""
-        config_file = config_workspace / "config" / "vhosts.yml"
-        
-        # 创建配置文件
-        config_data = [{"name": "monitored", "domains": ["monitored.com"], "type": "static", "root": "/var/www"}]
-        with open(config_file, 'w') as f:
-            yaml.dump(config_data, f)
-        
-        # 模拟监控逻辑
-        last_mtime = config_file.stat().st_mtime
-        
-        # 模拟配置文件被修改
-        updated_config = [{"name": "modified", "domains": ["modified.com"], "type": "static", "root": "/var/www"}]
-        with open(config_file, 'w') as f:
-            yaml.dump(updated_config, f)
-        
-        current_mtime = config_file.stat().st_mtime
-        
-        # 检测到变更
-        if current_mtime > last_mtime:
-            # 重新加载配置
-            with open(config_file, 'r') as f:
-                new_config = yaml.safe_load(f)
+    def test_ssl_certificate_integration(self, test_workspace):
+        """Test SSL certificate management integration"""
+        with patch('nginx_manager.ssl.manager.SSLManager._find_acme_sh') as mock_acme:
+            mock_acme.return_value = Path('/usr/local/bin/acme.sh')
             
-            assert new_config[0]['name'] == 'modified'
-            last_mtime = current_mtime
+            with patch('nginx_manager.config.settings.Settings') as mock_settings_class:
+                mock_settings = Mock()
+                mock_settings.ssl_certs_dir = test_workspace / "certs"
+                mock_settings_class.return_value = mock_settings
+                
+                ssl_manager = SSLManager()
+                
+                # Test certificate obtainment workflow
+                with patch('subprocess.run', return_value=Mock(returncode=0)), \
+                     patch('pathlib.Path.exists', return_value=True):
+                    
+                    result = ssl_manager.obtain_certificate('test.example.com')
+                    
+                    assert result['success'] is True
+                    assert result['domain'] == 'test.example.com'
+                    assert 'certificate_path' in result
+                    assert 'private_key_path' in result
 
-class TestTemplateRendering:
-    """测试模板渲染功能"""
-    
-    def test_jinja2_template_rendering(self):
-        """测试Jinja2模板渲染"""
-        from jinja2 import Template
+    def test_error_handling_in_workflow(self, test_workspace, config_generator_with_workspace):
+        """Test error handling in configuration workflow"""
+        generator = config_generator_with_workspace
         
-        template_content = """
-server {
-    listen {{ port | default(80) }};
-    server_name {{ domains | join(' ') }};
-    
-    {% if ssl %}
-    ssl_certificate {{ ssl_cert_path }};
-    ssl_certificate_key {{ ssl_key_path }};
-    {% endif %}
-    
-    {% for location in locations %}
-    location {{ location.path }} {
-        {{ location.config | indent(8) }}
-    }
-    {% endfor %}
-}
-"""
+        # Test invalid template
+        with pytest.raises(FileNotFoundError):
+            generator.generate_site_config(
+                domain='test.example.com',
+                template_name='nonexistent.j2'
+            )
         
-        template = Template(template_content)
-        
-        # 测试数据
-        test_data = {
-            "port": 443,
-            "domains": ["test.example.com", "www.test.example.com"],
-            "ssl": True,
-            "ssl_cert_path": "/app/certs/test.example.com/fullchain.cer",
-            "ssl_key_path": "/app/certs/test.example.com/test.example.com.key",
-            "locations": [
-                {
-                    "path": "/api",
-                    "config": "proxy_pass http://backend:8080;\nproxy_set_header Host $host;"
-                },
-                {
-                    "path": "/",
-                    "config": "root /var/www/html;\ntry_files $uri $uri/ =404;"
-                }
-            ]
-        }
-        
-        rendered = template.render(**test_data)
-        
-        # 验证渲染结果
-        assert "listen 443;" in rendered
-        assert "test.example.com www.test.example.com" in rendered
-        assert "ssl_certificate" in rendered
-        assert "location /api" in rendered
-        assert "location /" in rendered
-        assert "proxy_pass http://backend:8080;" in rendered
+        # Test invalid domain
+        config = generator.generate_site_config(
+            domain='',  # Empty domain
+            ssl=True
+        )
+        # Should still generate config but may have issues
+        assert config is not None
 
-    def test_template_error_handling(self):
-        """测试模板错误处理"""
-        from jinja2 import Template, UndefinedError
+    def test_template_customization_workflow(self, test_workspace, config_generator_with_workspace):
+        """Test template customization workflow"""
+        generator = config_generator_with_workspace
         
-        template_content = "server_name {{ undefined_variable }};"
-        template = Template(template_content)
+        # Get existing template content
+        template_content = generator.get_template_content('proxy_ssl.conf.j2')
+        assert template_content is not None
+        assert '{{ domain }}' in template_content
+        assert '{{ backend }}' in template_content
         
-        # 测试未定义变量
-        try:
-            template.render()
-            assert False, "Should raise UndefinedError"
-        except UndefinedError:
-            pass  # 预期的异常
+        # Test template rendering with custom data
+        config = generator.generate_site_config(
+            domain='custom.example.com',
+            backend='http://custom-backend:8080',
+            ssl=True
+        )
+        
+        assert 'custom.example.com' in config
+        assert 'http://custom-backend:8080' in config
+        assert 'ssl_certificate' in config
 
-    def test_template_with_filters(self):
-        """测试模板过滤器"""
-        from jinja2 import Template
+
+class TestConfigValidation:
+    """Test configuration validation workflow"""
+    
+    def test_nginx_config_validation_integration(self, test_workspace):
+        """Test nginx configuration validation"""
+        with patch('nginx_manager.ssl.manager.SSLManager._find_acme_sh') as mock_acme:
+            mock_acme.return_value = Path('/usr/local/bin/acme.sh')
+            
+            with patch('nginx_manager.config.settings.Settings') as mock_settings_class:
+                mock_settings = Mock()
+                mock_settings.nginx_config_dir = test_workspace / "nginx"
+                mock_settings.ssl_certs_dir = test_workspace / "certs"
+                mock_settings.logs_dir = test_workspace / "logs"
+                mock_settings.www_dir = test_workspace / "www"
+                mock_settings_class.return_value = mock_settings
+                
+                manager = NginxManager()
+                
+                # Test nginx status and validation
+                with patch('subprocess.run') as mock_run:
+                    # Mock successful nginx test
+                    mock_run.side_effect = [
+                        Mock(returncode=0),  # service status
+                        Mock(returncode=0),  # nginx -t
+                        Mock(returncode=0, stderr='nginx version: nginx/1.20.0')  # nginx -v
+                    ]
+                    
+                    status = manager.get_nginx_status()
+                    
+                    assert status['status'] == 'running'
+                    assert status['config_test'] is True
+                    assert '1.20.0' in status['version']
+
+    def test_site_management_workflow(self, test_workspace):
+        """Test complete site management workflow"""
+        with patch('nginx_manager.ssl.manager.SSLManager._find_acme_sh') as mock_acme:
+            mock_acme.return_value = Path('/usr/local/bin/acme.sh')
+            
+            with patch('nginx_manager.config.settings.Settings') as mock_settings_class:
+                mock_settings = Mock()
+                mock_settings.nginx_config_dir = test_workspace / "nginx"
+                mock_settings.ssl_certs_dir = test_workspace / "certs"
+                mock_settings.logs_dir = test_workspace / "logs"
+                mock_settings.www_dir = test_workspace / "www"
+                mock_settings_class.return_value = mock_settings
+                
+                manager = NginxManager()
+                
+                # Test site addition workflow
+                with patch('pathlib.Path.exists', return_value=False), \
+                     patch('builtins.open'), \
+                     patch('subprocess.run', return_value=Mock(returncode=0)), \
+                     patch.object(manager.ssl_manager, 'obtain_certificate', 
+                                 return_value={'success': True}):
+                    
+                    # Add site
+                    result = manager.add_site('test.example.com', 'http://localhost:3000')
+                    assert result['success'] is True
+                    
+                    # Mock site exists for listing
+                    with patch('pathlib.Path.glob') as mock_glob:
+                        mock_config_files = [
+                            Mock(stem='test.example.com'),
+                            Mock(stem='api.example.com')
+                        ]
+                        mock_glob.return_value = mock_config_files
+                        
+                        # List sites
+                        sites = manager.list_sites()
+                        assert 'test.example.com' in sites
+                        assert 'api.example.com' in sites
+                    
+                    # Remove site
+                    with patch('pathlib.Path.exists', return_value=True), \
+                         patch('pathlib.Path.unlink'):
+                        
+                        result = manager.remove_site('test.example.com')
+                        assert result['success'] is True
+
+
+class TestPerformanceIntegration:
+    """Test performance aspects of integration"""
+    
+    def test_multiple_site_generation_performance(self, config_generator_with_workspace):
+        """Test performance with multiple site generation"""
+        generator = config_generator_with_workspace
         
-        template_content = """
-# Domains: {{ domains | join(', ') | upper }}
-# Root: {{ root | default('/var/www/html') }}
-# SSL: {{ ssl | default(false) | string | lower }}
-"""
+        # Generate configs for multiple sites
+        domains = [f'site{i}.example.com' for i in range(10)]
         
-        template = Template(template_content)
+        import time
+        start_time = time.time()
         
-        test_data = {
-            "domains": ["example.com", "www.example.com"],
-            "ssl": True
-        }
+        for domain in domains:
+            config = generator.generate_site_config(
+                domain=domain,
+                backend='http://localhost:3000',
+                ssl=True
+            )
+            assert config is not None
+            assert domain in config
         
-        rendered = template.render(**test_data)
+        end_time = time.time()
         
-        assert "EXAMPLE.COM, WWW.EXAMPLE.COM" in rendered
-        assert "Root: /var/www/html" in rendered
-        assert "SSL: true" in rendered 
+        # Should complete within reasonable time (less than 1 second for 10 sites)
+        assert (end_time - start_time) < 1.0
+    
+    def test_template_caching_behavior(self, config_generator_with_workspace):
+        """Test template caching behavior"""
+        generator = config_generator_with_workspace
+        
+        # Generate same config multiple times
+        import time
+        
+        # First generation
+        start_time = time.time()
+        config1 = generator.generate_site_config(
+            domain='cache-test.example.com',
+            ssl=True
+        )
+        first_time = time.time() - start_time
+        
+        # Second generation (should use cached template)
+        start_time = time.time()
+        config2 = generator.generate_site_config(
+            domain='cache-test2.example.com',
+            ssl=True
+        )
+        second_time = time.time() - start_time
+        
+        # Both configs should be identical in structure
+        assert config1 is not None
+        assert config2 is not None
+        assert 'ssl_certificate' in config1
+        assert 'ssl_certificate' in config2
+        
+        # Second generation should be faster or similar (template cached)
+        assert second_time <= first_time * 1.5  # Allow some variance 

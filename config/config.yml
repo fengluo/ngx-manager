@@ -1,0 +1,30 @@
+# Nginx Manager 主配置文件
+# 本配置文件可以被环境变量覆盖，环境变量格式：NGINX_MANAGER_<KEY>
+
+# Nginx 配置
+nginx:
+  # Nginx配置文件目录（可选）
+  # 如果不配置，系统将自动检测：
+  # - macOS: /usr/local/etc/nginx/servers
+  # - Linux: /etc/nginx/conf.d
+  # config_dir: "/custom/nginx/path"
+  
+# SSL 配置
+ssl:
+  certs_dir: "./certs"
+  email: "admin@example.com"
+  ca_server: "letsencrypt"
+  
+# ACME 配置
+acme:
+  staging: false
+  
+# 日志配置
+logs:
+  dir: "./logs"
+  level: "info"
+  
+# 服务配置
+service:
+  auto_reload: true
+  backup_configs: true 

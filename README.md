@@ -124,6 +124,21 @@ nginx-manager/
 
 ## 🔧 Configuration Guide
 
+### Environment-Specific Setup
+
+The project automatically detects your operating system and uses appropriate nginx configuration paths:
+
+- **Linux/Docker**: `/etc/nginx/conf.d`
+- **macOS (Homebrew)**: `/usr/local/etc/nginx/servers`
+
+You can override the auto-detected path by either:
+1. Setting it in `config/config.yml`:
+   ```yaml
+   nginx:
+     config_dir: "/custom/nginx/path"
+   ```
+2. Using environment variable: `export NGINX_MANAGER_NGINX_CONFIG_DIR="/custom/nginx/path"`
+
 ### Virtual Host Configuration (vhosts.yml)
 
 Supports two configuration formats:
@@ -234,94 +249,180 @@ locations:
 
 ## 🎯 Usage Examples
 
-### Service Management
+### Docker Deployment
+
+#### Using Makefile (Recommended)
 
 ```bash
-# Basic startup
-python3 start.py
+# Build Docker image
+make docker-build
 
-# Rebuild and start
-python3 start.py build --no-cache
+# Start container in background
+make docker-start
 
-# Run in foreground (for debugging)
-python3 start.py start --no-detach
+# View logs
+make docker-logs
 
-# Using Docker Compose
-python3 start.py compose-up
+# Stop container
+make docker-stop
+
+# Restart container
+make docker-restart
+```
+
+#### Manual Docker Commands
+
+```bash
+# Build Docker image
+docker build -t nginx-manager .
+
+# Run container
+docker run -d --name nginx-manager \
+  -p 80:80 -p 443:443 \
+  -v $(pwd)/config:/app/config \
+  -v $(pwd)/logs:/app/logs \
+  -v $(pwd)/certs:/app/certs \
+  -v $(pwd)/nginx-conf:/etc/nginx/conf.d \
+  nginx-manager
+
+# View logs
+docker logs nginx-manager
+
+# Follow logs
+docker logs -f nginx-manager
+
+# Stop container
+docker stop nginx-manager
+
+# Remove container
+docker rm nginx-manager
+```
+
+#### Using Docker Compose
+
+Create a `docker-compose.yml` file:
+
+```yaml
+version: '3.8'
+services:
+  nginx-manager:
+    build: .
+    container_name: nginx-manager
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./config:/app/config
+      - ./logs:/app/logs
+      - ./certs:/app/certs
+      - ./nginx-conf:/etc/nginx/conf.d
+    restart: unless-stopped
+```
+
+Then run:
+
+```bash
+# Start services
+docker-compose up -d
+
+# View logs
+docker-compose logs -f
+
+# Stop services
+docker-compose down
 ```
 
 ### Container Management
-
-```bash
-# Check status
-python3 start.py status
-
-# View logs
-python3 start.py logs
-
-# Follow logs
-python3 start.py logs --follow
-
-# Restart service
-python3 start.py restart
-
-# Stop service
-python3 start.py stop
-```
-
-### Manual Operations
 
 ```bash
 # Enter container
 docker exec -it nginx-manager bash
 
 # Manual configuration generation
-docker exec nginx-manager python3 /app/scripts/generate-config.py --all
+docker exec nginx-manager nginx-manager list
 
-# Manual certificate application
-docker exec nginx-manager python3 /app/scripts/cert_manager.py --domain example.com
+# Manual certificate renewal
+docker exec nginx-manager nginx-manager renew
 
-# Manual renewal of all certificates
-docker exec nginx-manager python3 /app/scripts/cert_manager.py --renew-all
-
-# List certificates
-docker exec nginx-manager python3 /app/scripts/cert_manager.py --list
+# Reload nginx configuration
+docker exec nginx-manager nginx-manager reload
 ```
+
+### Native Installation
+
+For native installation (without Docker), see the [Installation Guide](#-installation).
 
 ## 🧪 Testing
 
 The project includes a comprehensive test suite with unit tests, integration tests, and end-to-end tests.
 
+### Quick Setup
+
+```bash
+# Setup development environment
+make setup-dev
+
+# Activate virtual environment
+source .venv/bin/activate
+
+# Run tests
+make test
+```
+
 ### Running Tests
 
 ```bash
-# Setup test environment (first time)
-python3 run_tests.py --setup-env
+# Run all tests
+make test
 
-# Run unit tests
-python3 run_tests.py --unit --use-venv
+# Run specific test types
+make test-unit          # Unit tests only
+make test-integration   # Integration tests only
+make test-e2e          # End-to-end tests (requires Docker)
 
-# Run end-to-end tests (includes Docker build)
-python3 run_tests.py --e2e --use-venv
+# Run tests with coverage
+make test-coverage
 
-# Run all tests with coverage
-python3 run_tests.py --all --use-venv --coverage
+# Manual pytest usage
+pytest tests/                    # All tests
+pytest tests/unit/              # Unit tests only
+pytest tests/ -m "not slow"    # Skip slow tests
+pytest tests/ -v               # Verbose output
+```
 
-# Skip Docker build for E2E tests
-python3 run_tests.py --e2e --use-venv --no-docker-build
+### Using Standard Virtual Environment
+
+If you prefer manual setup:
+
+```bash
+# Create virtual environment
+python3 -m venv .venv
+
+# Activate virtual environment
+source .venv/bin/activate  # Linux/macOS
+# or
+.venv\Scripts\activate     # Windows
+
+# Install development dependencies
+pip install -r requirements-dev.txt
+
+# Run tests
+pytest tests/
 ```
 
 ### Test Structure
 - **Unit Tests**: Test individual components in isolation
-- **Integration Tests**: Test component interactions
+- **Integration Tests**: Test component interactions  
 - **E2E Tests**: Test complete workflows with Docker
 - **Coverage Reports**: Generate detailed coverage reports
 
-### Test Documentation
+### Dependencies
 
-Detailed test reports and documentation are available in the `docs/` directory:
-- **Testing Guide**: See [docs/TESTING_GUIDE.md](docs/TESTING_GUIDE.md) for comprehensive testing instructions
-- **Test Reports**: See [docs/](docs/) for various test execution reports and summaries
+The project uses unified requirements management:
+- **requirements.txt**: Production dependencies
+- **requirements-dev.txt**: Development dependencies (includes testing tools)
+
+All test dependencies are included in `requirements-dev.txt` - no separate test requirements file is needed.
 
 ## 🔍 Troubleshooting
 

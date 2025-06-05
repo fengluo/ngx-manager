@@ -10,10 +10,7 @@ certs/
 *.cer
 *.csr
 
-# Generated nginx configuration files
-nginx-conf/
-
-# Python cache
+# Python cache and build artifacts
 __pycache__/
 *.py[cod]
 *$py.class
@@ -24,6 +21,7 @@ develop-eggs/
 dist/
 downloads/
 eggs/
+*.egg-info/
 
 # Virtual environment
 venv/
