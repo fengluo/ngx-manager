@@ -8,7 +8,7 @@ on:
 
 env:
   PYTHON_VERSION: '3.9'
-  DOCKER_IMAGE_NAME: nginx-manager
+  DOCKER_IMAGE_NAME: ngx-manager
 
 jobs:
   lint:
@@ -138,7 +138,7 @@ jobs:
         
         # Start container
         docker run -d \
-          --name nginx-manager-test \
+          --name ngx-manager-test \
           -p 8080:80 \
           -v $(pwd)/test-config:/app/config \
           ${{ env.DOCKER_IMAGE_NAME }}:test
@@ -147,20 +147,20 @@ jobs:
         sleep 30
         
         # Check container status
-        docker ps | grep nginx-manager-test
+        docker ps | grep ngx-manager-test
         
         # Check nginx process
-        docker exec nginx-manager-test pgrep nginx
+        docker exec ngx-manager-test pgrep nginx
         
         # Test HTTP response
         curl -f http://localhost:8080 || true
         
         # View logs
-        docker logs nginx-manager-test
+        docker logs ngx-manager-test
         
         # Cleanup
-        docker stop nginx-manager-test
-        docker rm nginx-manager-test
+        docker stop ngx-manager-test
+        docker rm ngx-manager-test
 
   e2e-tests:
     name: End-to-End Tests

@@ -1,5 +1,5 @@
 """
-Command line interface for nginx-manager
+Command line interface for ngx-manager
 """
 
 import os
@@ -200,7 +200,7 @@ def reload(ctx):
 @click.option('--setup-ssl', is_flag=True, help='Setup SSL/ACME tools')
 @click.pass_context
 def setup(ctx, install_deps: bool, setup_nginx: bool, setup_ssl: bool):
-    """Setup nginx-manager for native environment"""
+    """Setup ngx-manager for native environment"""
     env_manager = ctx.obj['env_manager']
     
     if not any([install_deps, setup_nginx, setup_ssl]):

@@ -47,7 +47,7 @@ trap cleanup SIGTERM SIGINT
 # Start nginx
 start_nginx
 
-# Keep container running and handle nginx-manager commands
+# Keep container running and handle ngx-manager commands
 while true; do
     # Check if nginx is still running
     if ! kill -0 $NGINX_PID 2>/dev/null; then

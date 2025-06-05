@@ -101,26 +101,26 @@ clean:
 # Docker operations
 .PHONY: docker-build
 docker-build:
-	docker build -t nginx-manager .
+	docker build -t ngx-manager .
 
 .PHONY: docker-start
 docker-start:
-	docker run -d --name nginx-manager \
+	docker run -d --name ngx-manager \
 		-p 80:80 -p 443:443 \
 		-v $(PWD)/config:/app/config \
 		-v $(PWD)/logs:/app/logs \
 		-v $(PWD)/certs:/app/certs \
 		--restart unless-stopped \
-		nginx-manager
+		ngx-manager
 
 .PHONY: docker-stop
 docker-stop:
-	docker stop nginx-manager || true
-	docker rm nginx-manager || true
+	docker stop ngx-manager || true
+	docker rm ngx-manager || true
 
 .PHONY: docker-logs
 docker-logs:
-	docker logs -f nginx-manager
+	docker logs -f ngx-manager
 
 # Package building
 .PHONY: package

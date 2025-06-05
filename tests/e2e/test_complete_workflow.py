@@ -1,5 +1,5 @@
 """
-End-to-end tests for complete nginx-manager workflow
+End-to-end tests for complete ngx-manager workflow
 """
 
 import pytest
@@ -19,7 +19,7 @@ from nginx_manager.config.settings import Settings
 
 @pytest.mark.e2e
 class TestCompleteWorkflow:
-    """Test complete nginx-manager workflow from start to finish"""
+    """Test complete ngx-manager workflow from start to finish"""
     
     @pytest.fixture
     def test_workspace(self):

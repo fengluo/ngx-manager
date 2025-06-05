@@ -51,7 +51,7 @@ A Docker-based Nginx automation management and configuration tool that supports 
 
 ```bash
 git clone <repository-url>
-cd nginx-manager
+cd ngx-manager
 ```
 
 ### 2. Start Services
@@ -75,7 +75,7 @@ python3 start.py compose-up
 python3 start.py logs --follow
 
 # Or use Docker command
-docker logs -f nginx-manager
+docker logs -f ngx-manager
 ```
 
 ### 5. Stop Services
@@ -87,7 +87,7 @@ python3 start.py stop
 ## 📁 Project Structure
 
 ```
-nginx-manager/
+ngx-manager/
 ├── Dockerfile                 # Docker image build file
 ├── docker-compose.yml         # Docker Compose configuration
 ├── start.py                   # Python startup script
@@ -274,28 +274,28 @@ make docker-restart
 
 ```bash
 # Build Docker image
-docker build -t nginx-manager .
+docker build -t ngx-manager .
 
 # Run container
-docker run -d --name nginx-manager \
+docker run -d --name ngx-manager \
   -p 80:80 -p 443:443 \
   -v $(pwd)/config:/app/config \
   -v $(pwd)/logs:/app/logs \
   -v $(pwd)/certs:/app/certs \
   -v $(pwd)/nginx-conf:/etc/nginx/conf.d \
-  nginx-manager
+  ngx-manager
 
 # View logs
-docker logs nginx-manager
+docker logs ngx-manager
 
 # Follow logs
-docker logs -f nginx-manager
+docker logs -f ngx-manager
 
 # Stop container
-docker stop nginx-manager
+docker stop ngx-manager
 
 # Remove container
-docker rm nginx-manager
+docker rm ngx-manager
 ```
 
 #### Using Docker Compose
@@ -305,9 +305,9 @@ Create a `docker-compose.yml` file:
 ```yaml
 version: '3.8'
 services:
-  nginx-manager:
+  ngx-manager:
     build: .
-    container_name: nginx-manager
+    container_name: ngx-manager
     ports:
       - "80:80"
       - "443:443"
@@ -336,16 +336,16 @@ docker-compose down
 
 ```bash
 # Enter container
-docker exec -it nginx-manager bash
+docker exec -it ngx-manager bash
 
 # Manual configuration generation
-docker exec nginx-manager nginx-manager list
+docker exec ngx-manager ngx-manager list
 
 # Manual certificate renewal
-docker exec nginx-manager nginx-manager renew
+docker exec ngx-manager ngx-manager renew
 
 # Reload nginx configuration
-docker exec nginx-manager nginx-manager reload
+docker exec ngx-manager ngx-manager reload
 ```
 
 ### Native Installation
@@ -431,7 +431,7 @@ All test dependencies are included in `requirements-dev.txt` - no separate test 
 1. **Certificate Application Failure**
    - Check if domain DNS resolution is correct
    - Ensure port 80 is accessible
-   - View certificate application logs: `docker exec nginx-manager cat /app/logs/cert.log`
+   - View certificate application logs: `docker exec ngx-manager cat /app/logs/cert.log`
 
 2. **Configuration Generation Failure**
    - Check configuration file syntax
@@ -502,7 +502,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 If you encounter issues or have suggestions:
 
-1. Check the [Issues](https://github.com/your-username/nginx-manager/issues) page
+1. Check the [Issues](https://github.com/your-username/ngx-manager/issues) page
 2. Create a new Issue describing the problem
 3. Contact maintainer: your-email@example.com
 

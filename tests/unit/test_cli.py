@@ -21,7 +21,7 @@ class TestCLI:
         result = runner.invoke(cli, ['--help'])
         
         assert result.exit_code == 0
-        assert 'nginx-manager' in result.output
+        assert 'ngx-manager' in result.output
         assert 'Commands:' in result.output
     
     @patch('nginx_manager.utils.environment.EnvironmentManager')
@@ -266,7 +266,7 @@ class TestCLIMain:
     @patch('nginx_manager.cli.cli')
     def test_main_function(self, mock_cli):
         """Test main function"""
-        with patch('sys.argv', ['nginx-manager', 'status']):
+        with patch('sys.argv', ['ngx-manager', 'status']):
             try:
                 main()
             except SystemExit:
@@ -277,7 +277,7 @@ class TestCLIMain:
     @patch('nginx_manager.cli.cli')
     def test_main_with_args(self, mock_cli):
         """Test main function with arguments"""
-        test_args = ['nginx-manager', 'add', '-d', 'test.com', '-b', 'http://localhost:3000']
+        test_args = ['ngx-manager', 'add', '-d', 'test.com', '-b', 'http://localhost:3000']
         
         with patch('sys.argv', test_args):
             try:

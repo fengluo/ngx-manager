@@ -59,7 +59,7 @@ COMPLEX_CONFIG = {
     ],
     "custom_config": """
     # Custom configuration
-    add_header X-Custom-Header "nginx-manager";
+            add_header X-Custom-Header "ngx-manager";
     error_page 404 /404.html;
     """
 }

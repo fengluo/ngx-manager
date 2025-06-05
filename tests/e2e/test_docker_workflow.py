@@ -59,8 +59,8 @@ class TestDockerWorkflow:
     @pytest.mark.slow
     def test_container_build_and_start(self, docker_client, test_configs):
         """Test container build and start"""
-        container_name = "nginx-manager-test"
-        image_name = "nginx-manager:test"
+        container_name = "ngx-manager-test"
+        image_name = "ngx-manager:test"
         
         try:
             # Clean up existing containers and images
@@ -132,8 +132,8 @@ class TestDockerWorkflow:
     @pytest.mark.network
     def test_http_response(self, docker_client, test_configs):
         """Test HTTP response"""
-        container_name = "nginx-manager-http-test"
-        image_name = "nginx-manager:test"
+        container_name = "ngx-manager-http-test"
+        image_name = "ngx-manager:test"
         
         try:
             # Start container
@@ -182,8 +182,8 @@ class TestDockerWorkflow:
 
     def test_config_reload_workflow(self, docker_client, test_configs):
         """Test configuration reload workflow"""
-        container_name = "nginx-manager-reload-test"
-        image_name = "nginx-manager:test"
+        container_name = "ngx-manager-reload-test"
+        image_name = "ngx-manager:test"
         
         try:
             # Start container
@@ -222,8 +222,8 @@ class TestDockerWorkflow:
 
     def test_certificate_management_workflow(self, docker_client, test_configs):
         """Test certificate management workflow"""
-        container_name = "nginx-manager-cert-test"
-        image_name = "nginx-manager:test"
+        container_name = "ngx-manager-cert-test"
+        image_name = "ngx-manager:test"
         
         try:
             # Start container
@@ -262,8 +262,8 @@ class TestDockerWorkflow:
 
     def test_logs_and_monitoring(self, docker_client, test_configs):
         """Test logs and monitoring"""
-        container_name = "nginx-manager-logs-test"
-        image_name = "nginx-manager:test"
+        container_name = "ngx-manager-logs-test"
+        image_name = "ngx-manager:test"
         
         try:
             # Start container

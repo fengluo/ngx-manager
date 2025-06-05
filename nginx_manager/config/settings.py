@@ -46,9 +46,9 @@ class Settings:
             # Current working directory
             Path.cwd() / "config",
             # User home directory
-            Path.home() / ".nginx-manager" / "config",
+            Path.home() / ".ngx-manager" / "config",
             # System config directory
-            Path("/etc/nginx-manager"),
+            Path("/etc/ngx-manager"),
             # Package directory (for development)
             Path(__file__).parent.parent.parent.parent / "config",
         ]

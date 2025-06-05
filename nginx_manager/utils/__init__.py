@@ -1,5 +1,5 @@
 """
-Utility modules for nginx-manager
+Utility modules for ngx-manager
 """
 
 from .environment import EnvironmentManager

@@ -22,14 +22,14 @@ def read_long_description():
         return "A modern nginx configuration and SSL certificate management tool"
 
 setup(
-    name="nginx-manager",
+    name="ngx-manager",
     version="2.0.0",
     description="A modern nginx configuration and SSL certificate management tool",
     long_description=read_long_description(),
     long_description_content_type="text/markdown",
     author="Nginx Manager Team",
     author_email="admin@example.com",
-    url="https://github.com/yourusername/nginx-manager",
+    url="https://github.com/yourusername/ngx-manager",
     packages=find_packages(),
     include_package_data=True,
     package_data={
@@ -44,7 +44,7 @@ setup(
     python_requires=">=3.8",
     entry_points={
         "console_scripts": [
-            "nginx-manager=nginx_manager.cli:main",
+            "ngx-manager=nginx_manager.cli:main",
             "nginx-mgr=nginx_manager.cli:main",
         ],
     },
@@ -64,8 +64,8 @@ setup(
     ],
     keywords="nginx ssl certificate management acme letsencrypt",
     project_urls={
-        "Bug Reports": "https://github.com/yourusername/nginx-manager/issues",
-        "Source": "https://github.com/yourusername/nginx-manager",
-        "Documentation": "https://github.com/yourusername/nginx-manager/docs",
+        "Bug Reports": "https://github.com/yourusername/ngx-manager/issues",
+        "Source": "https://github.com/yourusername/ngx-manager",
+        "Documentation": "https://github.com/yourusername/ngx-manager/docs",
     },
 ) 
