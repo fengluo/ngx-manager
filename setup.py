@@ -23,12 +23,11 @@ def read_long_description():
 
 setup(
     name="ngx-manager",
-    version="2.0.0",
+    version="1.0.0",
     description="A modern nginx configuration and SSL certificate management tool",
     long_description=read_long_description(),
     long_description_content_type="text/markdown",
-    author="Nginx Manager Team",
-    author_email="admin@example.com",
+    author="fengluo",
     url="https://github.com/fengluo/ngx-manager",
     packages=find_packages(),
     include_package_data=True,
