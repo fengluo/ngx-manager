@@ -24,8 +24,8 @@ class TestCLI:
         assert 'ngx-manager' in result.output
         assert 'Commands:' in result.output
     
-    @patch('nginx_manager.utils.environment.EnvironmentManager')
-    @patch('nginx_manager.core.manager.NginxManager')
+    @patch('nginx_manager.cli.EnvironmentManager')
+    @patch('nginx_manager.cli.NginxManager')
     def test_status_command(self, mock_manager_class, mock_env_manager_class):
         """Test status command"""
         # Mock manager instance
@@ -42,8 +42,12 @@ class TestCLI:
         mock_env_manager = Mock()
         mock_env_manager_class.return_value = mock_env_manager
         mock_env_manager.check_environment.return_value = {
-            'nginx': True,
-            'python': True
+            'nginx': {'available': True, 'version': '1.20.0'},
+            'python': {'available': True, 'version': '3.9.0'},
+            'openssl': {'available': True, 'version': '1.1.1'},
+            'curl': {'available': True, 'version': '7.68.0'},
+            'nginx_config_writable': {'available': True, 'path': '/etc/nginx/conf.d'},
+            'acme.sh': {'available': True, 'version': '3.0.0'}
         }
         
         runner = CliRunner()
@@ -53,8 +57,8 @@ class TestCLI:
         assert 'running' in result.output
         mock_manager.get_nginx_status.assert_called_once()
     
-    @patch('nginx_manager.utils.environment.EnvironmentManager')
-    @patch('nginx_manager.core.manager.NginxManager')
+    @patch('nginx_manager.cli.EnvironmentManager')
+    @patch('nginx_manager.cli.NginxManager')
     def test_add_command(self, mock_manager_class, mock_env_manager_class):
         """Test add command"""
         # Mock manager instance
@@ -87,8 +91,8 @@ class TestCLI:
             force=False
         )
     
-    @patch('nginx_manager.utils.environment.EnvironmentManager')
-    @patch('nginx_manager.core.manager.NginxManager')
+    @patch('nginx_manager.cli.EnvironmentManager')
+    @patch('nginx_manager.cli.NginxManager')
     def test_remove_command(self, mock_manager_class, mock_env_manager_class):
         """Test remove command"""
         # Mock manager instance
@@ -109,8 +113,8 @@ class TestCLI:
         assert result.exit_code == 0
         mock_manager.remove_site.assert_called_once_with(domain='test.example.com')
     
-    @patch('nginx_manager.utils.environment.EnvironmentManager')
-    @patch('nginx_manager.core.manager.NginxManager')
+    @patch('nginx_manager.cli.EnvironmentManager')
+    @patch('nginx_manager.cli.NginxManager')
     def test_list_command(self, mock_manager_class, mock_env_manager_class):
         """Test list command"""
         # Mock manager instance
@@ -134,8 +138,8 @@ class TestCLI:
         mock_manager.list_sites.assert_called_once()
     
     @patch('subprocess.run')
-    @patch('nginx_manager.utils.environment.EnvironmentManager')
-    @patch('nginx_manager.core.manager.NginxManager')
+    @patch('nginx_manager.cli.EnvironmentManager')
+    @patch('nginx_manager.cli.NginxManager')
     def test_reload_command(self, mock_manager_class, mock_env_manager_class, mock_subprocess):
         """Test reload command"""
         # Mock subprocess for nginx reload
@@ -161,7 +165,7 @@ class TestCLI:
 class TestEnvironmentCLI:
     """Test environment CLI commands"""
     
-    @patch('nginx_manager.utils.environment.EnvironmentManager')
+    @patch('nginx_manager.cli.EnvironmentManager')
     def test_setup_command(self, mock_env_manager):
         """Test setup command"""
         # Mock environment manager
@@ -179,7 +183,7 @@ class TestEnvironmentCLI:
         mock_manager.setup_nginx.assert_called_once()
         mock_manager.setup_ssl.assert_called_once()
     
-    @patch('nginx_manager.utils.environment.EnvironmentManager')
+    @patch('nginx_manager.cli.EnvironmentManager')
     def test_check_command(self, mock_env_manager):
         """Test check command"""
         # Mock environment manager
@@ -202,7 +206,7 @@ class TestEnvironmentCLI:
 class TestCLIErrorHandling:
     """Test CLI error handling"""
     
-    @patch('nginx_manager.core.manager.NginxManager')
+    @patch('nginx_manager.cli.NginxManager')
     def test_status_command_error(self, mock_manager_class):
         """Test status command with error"""
         # Mock manager with error
@@ -216,7 +220,7 @@ class TestCLIErrorHandling:
         assert result.exit_code != 0
         assert 'error' in result.output.lower()
     
-    @patch('nginx_manager.core.manager.NginxManager')
+    @patch('nginx_manager.cli.NginxManager')
     def test_add_command_failure(self, mock_manager_class):
         """Test add command with failure"""
         # Mock manager with failure result
@@ -291,7 +295,7 @@ class TestCLIMain:
 class TestCLIOutput:
     """Test CLI output formatting"""
     
-    @patch('nginx_manager.core.manager.NginxManager')
+    @patch('nginx_manager.cli.NginxManager')
     def test_verbose_output(self, mock_manager_class):
         """Test verbose output option"""
         # Mock manager instance
@@ -311,7 +315,7 @@ class TestCLIOutput:
         # Verbose output should contain more details
         assert 'pid' in result.output.lower() or '1234' in result.output
     
-    @patch('nginx_manager.core.manager.NginxManager')
+    @patch('nginx_manager.cli.NginxManager')
     def test_json_output(self, mock_manager_class):
         """Test JSON output option"""
         # Mock manager instance
