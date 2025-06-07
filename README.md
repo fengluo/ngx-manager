@@ -412,7 +412,7 @@ pytest tests/
 
 ### Test Structure
 - **Unit Tests**: Test individual components in isolation
-- **Integration Tests**: Test component interactions  
+- **Integration Tests**: Test component interactions
 - **E2E Tests**: Test complete workflows with Docker
 - **Coverage Reports**: Generate detailed coverage reports
 
