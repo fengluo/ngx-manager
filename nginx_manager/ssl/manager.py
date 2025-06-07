@@ -89,7 +89,7 @@ class SSLManager:
                     # Fallback to temp directory if /var/www is not writable
                     webroot = Path.home() / '.acme.sh' / 'webroot'
                     webroot.mkdir(parents=True, exist_ok=True)
-                args.extend(['--webroot', str(webroot)])
+                    args.extend(['--webroot', str(webroot)])
             elif challenge_method == 'dns':
                 # DNS challenge - would need DNS provider specific setup
                 return {

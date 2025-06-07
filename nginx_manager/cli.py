@@ -1,14 +1,13 @@
 """
-Command line interface for ngx-manager
+Command-line interface for nginx-manager
 """
 
-import os
 import sys
 import click
 from pathlib import Path
 from typing import Optional
 
-from .config.settings import settings
+from .config.settings import settings, Settings
 from .core.manager import NginxManager
 from .utils.environment import EnvironmentManager
 
@@ -20,20 +19,20 @@ from .utils.environment import EnvironmentManager
 @click.option("--verbose", "-v", is_flag=True, help="Enable verbose output")
 @click.pass_context
 def cli(ctx, config_dir: Optional[str], verbose: bool):
-    """Nginx Manager - Modern nginx configuration and SSL certificate management tool"""
+    """Nginx Manager - Simplified nginx configuration management"""
+    # Initialize context
     ctx.ensure_object(dict)
+    ctx.obj['verbose'] = verbose
     
-    # Set up configuration
+    # Initialize settings with custom config directory if provided
     if config_dir:
-        os.environ["NGINX_MANAGER_CONFIG_DIR"] = config_dir
+        ctx.obj['settings'] = Settings(config_dir=config_dir)
+    else:
+        ctx.obj['settings'] = settings
     
-    # Set up verbose mode
-    if verbose:
-        os.environ["NGINX_MANAGER_LOG_LEVEL"] = "DEBUG"
-    
-    # Initialize manager
-    ctx.obj["manager"] = NginxManager()
-    ctx.obj["env_manager"] = EnvironmentManager()
+    # Initialize managers
+    ctx.obj['manager'] = NginxManager()
+    ctx.obj['env_manager'] = EnvironmentManager()
 
 
 @cli.command()
@@ -71,20 +70,20 @@ def status(ctx, verbose: bool):
         if nginx_status.get("config_test"):
             click.echo(f"Config test: {'✓ Pass' if nginx_status['config_test'] else '✗ Fail'}")
             
-            # Show verbose information if requested
-            if verbose:
-                if nginx_status.get("version"):
-                    click.echo(f"Version: {nginx_status['version']}")
-                if nginx_status.get("pid"):
-                    click.echo(f"PID: {nginx_status['pid']}")
+        # Show verbose information if requested
+        if verbose:
+            if nginx_status.get("version"):
+                click.echo(f"Version: {nginx_status['version']}")
+            if nginx_status.get("pid"):
+                click.echo(f"PID: {nginx_status['pid']}")
     except Exception as e:
         click.echo(f"✗ Error getting nginx status: {e}")
         sys.exit(1)
 
 
-@cli.command()
+@cli.command(name='list')
 @click.pass_context
-def list(ctx):
+def list_sites(ctx):
     """List all configured sites"""
     manager = ctx.obj["manager"]
     
@@ -124,7 +123,7 @@ def add(ctx, domain: str, backend: Optional[str], no_ssl: bool, force: bool):
         click.echo("SSL: Disabled")
     
     result = manager.add_site(domain=domain, backend=backend, ssl=ssl, force=force)
-    
+        
     if result['success']:
         click.echo("✓ Site added successfully")
         if ssl:
@@ -150,7 +149,7 @@ def remove(ctx, domain: str, force: bool):
     
     click.echo(f"Removing site: {domain}")
     result = manager.remove_site(domain)
-    
+        
     if result['success']:
         click.echo("✓ Site removed successfully")
         click.echo("✓ SSL certificate removed")
@@ -174,7 +173,7 @@ def renew(ctx, domain: Optional[str], force: bool):
         click.echo("Renewing all certificates...")
     
     result = manager.renew_certificates(domain=domain, force=force)
-    
+        
     if result['success']:
         renewed = result.get('renewed', [])
         if renewed:
@@ -199,13 +198,13 @@ def reload(ctx):
     
     click.echo("Reloading nginx configuration...")
     result = manager.reload_nginx()
-    
+        
     if result['success']:
         click.echo("✓ Nginx configuration reloaded successfully")
     else:
         click.echo(f"✗ Failed to reload nginx: {result['error']}")
         sys.exit(1)
-
+            
 
 @cli.command()
 @click.pass_context
@@ -283,7 +282,7 @@ def generate(ctx):
                     config_file = settings.nginx_config_dir / f"{name}.conf"
                     with open(config_file, 'w', encoding='utf-8') as f:
                         f.write(config_content)
-                    
+        
                     click.echo(f"✓ Generated: {config_file}")
                     generated += 1
                 except Exception as e:
@@ -307,28 +306,23 @@ def generate(ctx):
 @cli.command()
 @click.pass_context
 def templates(ctx):
-    """List available nginx templates"""
-    try:
-        from .templates.generator import ConfigGenerator
-        generator = ConfigGenerator()
-        
-        templates = generator.list_available_templates()
-        
-        if not templates:
-            click.echo("No templates found.")
-            return
-        
-        click.echo("=== Available Templates ===")
-        for template in templates:
-            click.echo(f"• {template}")
-            
-    except Exception as e:
-        click.echo(f"✗ Failed to list templates: {e}")
-        sys.exit(1)
+    """List available nginx configuration templates"""
+    from .templates.generator import ConfigGenerator
+    
+    generator = ConfigGenerator()
+    templates_dir = generator.templates_dir
+    
+    click.echo("=== Available Templates ===")
+    if templates_dir.exists():
+        for template_file in templates_dir.glob("*.j2"):
+            click.echo(f"• {template_file.name}")
+    else:
+        click.echo("No custom templates found.")
+        click.echo(f"Templates directory: {templates_dir}")
 
 
 def main():
-    """Main entry point"""
+    """Main entry point for the CLI"""
     cli()
 
 

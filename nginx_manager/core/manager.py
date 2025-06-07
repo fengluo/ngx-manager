@@ -2,9 +2,7 @@
 Core nginx management functionality
 """
 
-import os
 import subprocess
-import yaml
 from pathlib import Path
 from typing import Dict, Any, List, Optional
 from ..config.settings import settings
@@ -20,15 +18,16 @@ class NginxManager:
         self.ssl_manager = SSLManager()
         self.config_generator = ConfigGenerator()
         
-        # Ensure required directories exist
+        # Ensure necessary directories exist
         self._ensure_directories()
     
     def _ensure_directories(self):
-        """Ensure all required directories exist"""
+        """Ensure required directories exist"""
         directories = [
             settings.nginx_config_dir,
             settings.ssl_certs_dir,
             settings.logs_dir,
+            settings.www_dir
         ]
         
         for directory in directories:
