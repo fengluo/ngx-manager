@@ -81,7 +81,13 @@ class SSLManager:
             if challenge_method == 'http':
                 # Use webroot method with nginx document root
                 webroot = Path('/var/www/html')
-                if not webroot.exists():
+                try:
+                    if not webroot.exists():
+                        webroot.mkdir(parents=True, exist_ok=True)
+                    args.extend(['--webroot', str(webroot)])
+                except PermissionError:
+                    # Fallback to temp directory if /var/www is not writable
+                    webroot = Path.home() / '.acme.sh' / 'webroot'
                     webroot.mkdir(parents=True, exist_ok=True)
                 args.extend(['--webroot', str(webroot)])
             elif challenge_method == 'dns':
