@@ -26,8 +26,9 @@ class EnvironmentManager:
         
         try:
             # Try to read /etc/os-release
-            with open('/etc/os-release', 'r') as f:
-                content = f.read()
+            os_release_path = Path('/etc/os-release')
+            if os_release_path.exists():
+                content = os_release_path.read_text()
                 if 'ubuntu' in content.lower():
                     return 'ubuntu'
                 elif 'debian' in content.lower():
@@ -40,7 +41,7 @@ class EnvironmentManager:
                     return 'fedora'
                 elif 'arch' in content.lower():
                     return 'arch'
-        except FileNotFoundError:
+        except (FileNotFoundError, PermissionError):
             pass
         
         # Fallback detection methods
@@ -51,44 +52,68 @@ class EnvironmentManager:
         
         return 'unknown'
     
-    def check_environment(self) -> Dict[str, bool]:
+    def check_environment(self) -> Dict[str, Dict[str, Any]]:
         """Check environment status"""
         checks = {}
         
         # Check Python version
-        checks['python'] = sys.version_info >= (3, 8)
+        checks['python'] = {
+            'available': sys.version_info >= (3, 8),
+            'version': f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}"
+        }
         
         # Check nginx
-        checks['nginx'] = self._check_command_exists('nginx')
+        nginx_available = self._check_command_exists('nginx')
+        checks['nginx'] = {
+            'available': nginx_available,
+            'version': self._get_command_version('nginx', ['-v']) if nginx_available else None
+        }
         
         # Check openssl
-        checks['openssl'] = self._check_command_exists('openssl')
+        openssl_available = self._check_command_exists('openssl')
+        checks['openssl'] = {
+            'available': openssl_available,
+            'version': self._get_command_version('openssl', ['version']) if openssl_available else None
+        }
         
         # Check curl
-        checks['curl'] = self._check_command_exists('curl')
+        curl_available = self._check_command_exists('curl')
+        checks['curl'] = {
+            'available': curl_available,
+            'version': self._get_command_version('curl', ['--version']) if curl_available else None
+        }
         
         # Check if we can write to nginx config directory
         try:
             test_file = settings.nginx_config_dir / '.write_test'
             test_file.touch()
             test_file.unlink()
-            checks['nginx_config_writable'] = True
+            nginx_config_writable = True
         except (PermissionError, OSError):
-            checks['nginx_config_writable'] = False
+            nginx_config_writable = False
+        
+        checks['nginx_config_writable'] = {
+            'available': nginx_config_writable,
+            'path': str(settings.nginx_config_dir)
+        }
         
         # Check acme.sh
-        checks['acme.sh'] = self._check_acme_sh()
+        acme_available = self._check_acme_sh()
+        checks['acme.sh'] = {
+            'available': acme_available,
+            'version': self._get_command_version('acme.sh', ['--version']) if acme_available else None
+        }
         
         return checks
     
     def _check_command_exists(self, command: str) -> bool:
         """Check if a command exists in PATH"""
         try:
-            subprocess.run([command, '--version'], 
+            result = subprocess.run([command, '--version'], 
                          capture_output=True, 
                          check=False,
                          timeout=5)
-            return True
+            return result.returncode == 0
         except (subprocess.TimeoutExpired, FileNotFoundError):
             return False
     
@@ -105,6 +130,41 @@ class EnvironmentManager:
                 return True
         
         return self._check_command_exists('acme.sh')
+    
+    def _get_command_version(self, command: str, version_args: list = None) -> str:
+        """Get command version"""
+        if version_args is None:
+            version_args = ['--version']
+        
+        try:
+            result = subprocess.run([command] + version_args, capture_output=True, text=True, check=True)
+            # Try stdout first, then stderr (some commands output version to stderr)
+            output = result.stdout or result.stderr
+            
+            # Convert to string and handle mock objects
+            output = str(output)
+            if hasattr(output, 'strip'):
+                output = output.strip()
+            
+            # Extract version number from common patterns
+            import re
+            # Look for patterns like "nginx/1.20.0", "Python 3.9.0", "version: nginx/1.20.0"
+            version_patterns = [
+                r'(\d+\.\d+\.\d+)',  # X.Y.Z
+                r'(\d+\.\d+)',       # X.Y
+                r'(\d+)',            # X
+            ]
+            
+            for pattern in version_patterns:
+                match = re.search(pattern, output)
+                if match:
+                    return match.group(1)
+            
+            # If no version pattern found, return as-is (e.g., "unknown")
+            return output.lower()
+            
+        except subprocess.CalledProcessError:
+            return "Unknown"
     
     def install_dependencies(self) -> Dict[str, Any]:
         """Install system dependencies"""
@@ -277,12 +337,14 @@ class EnvironmentManager:
         
         return None
     
-    def _nginx_config_includes_our_dir(self, config_path: Path) -> bool:
+    def _nginx_config_includes_our_dir(self, config_path: Path, target_dir: Path = None) -> bool:
         """Check if nginx config includes our configuration directory"""
         try:
-            with open(config_path, 'r') as f:
-                content = f.read()
-                return str(settings.nginx_config_dir) in content
+            if target_dir is None:
+                target_dir = settings.nginx_config_dir
+            
+            content = config_path.read_text()
+            return str(target_dir) in content
         except Exception:
             return False
     
