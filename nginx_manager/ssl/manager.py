@@ -27,6 +27,8 @@ class SSLManager:
             Path.home() / '.acme.sh' / 'acme.sh',
             Path('/usr/local/bin/acme.sh'),
             Path('/usr/bin/acme.sh'),
+            Path('/root/.acme.sh/acme.sh'),  # Common Docker path
+            Path('/app/.acme.sh/acme.sh'),   # Alternative Docker path
         ]
         
         for path in possible_paths:
@@ -40,13 +42,25 @@ class SSLManager:
                 return Path(result.stdout.strip())
         except subprocess.CalledProcessError:
             pass
+        except FileNotFoundError:
+            pass
         
         return None
     
     def _run_acme_command(self, args: List[str], check: bool = True) -> subprocess.CompletedProcess:
         """Run acme.sh command"""
         if not self.acme_sh_path:
-            raise RuntimeError("acme.sh not found. Please install it first.")
+            # Provide detailed error information
+            searched_paths = [
+                str(Path.home() / '.acme.sh' / 'acme.sh'),
+                '/usr/local/bin/acme.sh',
+                '/usr/bin/acme.sh',
+                '/root/.acme.sh/acme.sh',
+                '/app/.acme.sh/acme.sh',
+            ]
+            error_msg = f"acme.sh not found. Searched paths:\n" + "\n".join(f"  - {path}" for path in searched_paths)
+            error_msg += "\n\nPlease install acme.sh using: curl https://get.acme.sh | sh"
+            raise RuntimeError(error_msg)
         
         cmd = [str(self.acme_sh_path)] + args
         
@@ -74,7 +88,7 @@ class SSLManager:
             args = [
                 '--issue',
                 '-d', domain,
-                '--ca-server', self._get_ca_server(),
+                '--server', self._get_ca_server(),
             ]
             
             # Add challenge method
@@ -115,7 +129,7 @@ class SSLManager:
                         '-d', domain,
                         '--standalone',
                         '--httpport', '80',
-                        '--ca-server', self._get_ca_server(),
+                        '--server', self._get_ca_server(),
                         '--email', settings.ssl_email
                     ]
                     

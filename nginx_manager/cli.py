@@ -271,8 +271,9 @@ def test(ctx):
 
 @cli.command()
 @click.option("--no-ssl", is_flag=True, help="Skip SSL certificate generation")
+@click.option("--auto-confirm", is_flag=True, help="Auto-confirm prompts (non-interactive mode)")
 @click.pass_context
-def generate(ctx, no_ssl: bool):
+def generate(ctx, no_ssl: bool, auto_confirm: bool):
     """Generate nginx configuration from vhosts.yml"""
     manager = ctx.obj["manager"]
     
@@ -357,10 +358,15 @@ def generate(ctx, no_ssl: bool):
                 for error in ssl_errors:
                     click.echo(f"  • {error}")
                 
-                # Ask user if they want to continue without SSL certificates
-                if not click.confirm("Continue generating configurations without SSL certificates?"):
-                    click.echo("Operation cancelled.")
-                    sys.exit(1)
+                # Check if running in interactive mode
+                if not auto_confirm and sys.stdin.isatty():
+                    # Interactive mode - ask user
+                    if not click.confirm("Continue generating configurations without SSL certificates?"):
+                        click.echo("Operation cancelled.")
+                        sys.exit(1)
+                else:
+                    # Non-interactive mode or auto-confirm - auto-continue with warning
+                    click.echo("⚠ Continuing without SSL certificates (non-interactive mode)")
                     
                 # Disable SSL for failed domains
                 failed_domains = [error.split(':')[0] for error in ssl_errors]
