@@ -79,7 +79,8 @@ class ConfigGenerator:
     def get_template_content(self, template_name: str) -> str:
         """Get the content of a template file for inspection"""
         try:
-            template = self.env.get_template(template_name)
-            return template.source
+            # Get template source directly from loader
+            source, _, _ = self.env.loader.get_source(self.env, template_name)
+            return source
         except TemplateNotFound:
             raise FileNotFoundError(f"Template not found: {template_name}") 
