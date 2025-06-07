@@ -19,6 +19,9 @@ help:
 	@echo "  test-unit     - Run unit tests"
 	@echo "  test-integration - Run integration tests"
 	@echo "  test-e2e      - Run end-to-end tests"
+	@echo "  test-e2e-simple - Run simple Docker e2e tests"
+	@echo "  test-e2e-complete - Run complete Docker e2e tests"
+	@echo "  test-docker   - Run all Docker tests"
 	@echo "  test-coverage - Run tests with coverage report"
 	@echo "  lint          - Run code linting"
 	@echo "  format        - Format code with black"
@@ -70,7 +73,18 @@ test-integration:
 
 .PHONY: test-e2e
 test-e2e:
-	$(PYTHON_VENV) -m pytest tests/e2e/ -v
+	$(PYTHON_VENV) -m pytest tests/e2e/ -v -m "e2e"
+
+.PHONY: test-e2e-simple
+test-e2e-simple:
+	$(PYTHON_VENV) -m pytest tests/e2e/test_docker_simple.py -v -m "e2e and docker"
+
+.PHONY: test-e2e-complete
+test-e2e-complete:
+	$(PYTHON_VENV) -m pytest tests/e2e/test_docker_complete.py -v -m "e2e and docker and slow"
+
+.PHONY: test-docker
+test-docker: test-e2e-simple test-e2e-complete
 
 .PHONY: test-coverage
 test-coverage:
