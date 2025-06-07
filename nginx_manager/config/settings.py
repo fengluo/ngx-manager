@@ -19,7 +19,7 @@ class Settings:
         
         Args:
             config_dir: Configuration directory path
-        """
+                """
         # Load environment variables from .env file
         try:
             load_dotenv()
@@ -196,10 +196,20 @@ class Settings:
         """Get SSL CA server"""
         return self.get('ssl.ca_server', 'letsencrypt')
     
+    @ssl_ca_server.setter
+    def ssl_ca_server(self, value: str) -> None:
+        """Set SSL CA server"""
+        self.set('ssl.ca_server', value)
+    
     @property
     def acme_staging(self) -> bool:
         """Check if using ACME staging environment"""
         return self.get('acme.staging', False)
+    
+    @acme_staging.setter
+    def acme_staging(self, value: bool) -> None:
+        """Set ACME staging mode"""
+        self.set('acme.staging', value)
 
 
 # Global settings instance
