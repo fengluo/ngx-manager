@@ -223,8 +223,9 @@ def test(ctx):
 
 
 @cli.command()
+@click.option("--no-ssl", is_flag=True, help="Skip SSL certificate generation")
 @click.pass_context
-def generate(ctx):
+def generate(ctx, no_ssl: bool):
     """Generate nginx configuration from vhosts.yml"""
     manager = ctx.obj["manager"]
     
@@ -253,6 +254,8 @@ def generate(ctx):
         click.echo("Generating nginx configurations...")
         
         generated = 0
+        ssl_domains = []  # Track domains that need SSL certificates
+        
         for vhost in vhosts:
             if not isinstance(vhost, dict) or 'name' not in vhost:
                 click.echo(f"⚠ Skipping invalid vhost configuration: {vhost}")
@@ -285,10 +288,47 @@ def generate(ctx):
         
                     click.echo(f"✓ Generated: {config_file}")
                     generated += 1
+                    
+                    # Track SSL domains for certificate generation
+                    if ssl:
+                        ssl_domains.append(primary_domain)
+                        
                 except Exception as e:
                     click.echo(f"✗ Failed to generate config for {name}: {e}")
         
         click.echo(f"✓ Generated {generated} configuration files")
+        
+        # Generate SSL certificates for domains that need them
+        if ssl_domains and not no_ssl:
+            click.echo("Generating SSL certificates...")
+            ssl_success = 0
+            ssl_errors = []
+            
+            for domain in ssl_domains:
+                click.echo(f"  Obtaining certificate for {domain}...")
+                ssl_result = manager.ssl_manager.obtain_certificate(domain)
+                if ssl_result['success']:
+                    click.echo(f"  ✓ Certificate obtained for {domain}")
+                    ssl_success += 1
+                else:
+                    error_msg = f"{domain}: {ssl_result['error']}"
+                    click.echo(f"  ✗ Failed to obtain certificate for {domain}: {ssl_result['error']}")
+                    ssl_errors.append(error_msg)
+            
+            if ssl_success > 0:
+                click.echo(f"✓ Generated {ssl_success} SSL certificates")
+            
+            if ssl_errors:
+                click.echo("⚠ Some SSL certificates failed:")
+                for error in ssl_errors:
+                    click.echo(f"  • {error}")
+                
+                # Don't fail the entire command if only SSL certificates failed
+                click.echo("⚠ You can manually obtain certificates later using the 'renew' command")
+        elif ssl_domains and no_ssl:
+            click.echo(f"⚠ {len(ssl_domains)} domains require SSL certificates but --no-ssl was specified")
+            click.echo("  You can obtain certificates later using the 'renew' command")
+            click.echo(f"  Domains: {', '.join(ssl_domains)}")
         
         # Test configuration
         click.echo("Testing generated configurations...")
