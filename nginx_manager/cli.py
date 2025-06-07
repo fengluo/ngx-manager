@@ -178,6 +178,8 @@ def renew(ctx, domain: Optional[str], force: bool):
         renewed = result.get('renewed', [])
         if renewed:
             click.echo(f"✓ Renewed certificates for: {', '.join(renewed)}")
+            if result.get('nginx_reloaded'):
+                click.echo("✓ Nginx configuration reloaded")
         else:
             click.echo("✓ No certificates needed renewal")
         
@@ -188,6 +190,51 @@ def renew(ctx, domain: Optional[str], force: bool):
     else:
         click.echo(f"✗ Failed to renew certificates: {result['error']}")
         sys.exit(1)
+
+
+@cli.command()
+@click.option("--enable", is_flag=True, help="Enable automatic certificate renewal")
+@click.option("--disable", is_flag=True, help="Disable automatic certificate renewal")
+@click.option("--status", is_flag=True, help="Show auto-renewal status")
+@click.option("--interval", default="daily", type=click.Choice(['daily', 'weekly', 'monthly']), 
+              help="Renewal check interval (default: daily)")
+@click.pass_context
+def auto_renew(ctx, enable: bool, disable: bool, status: bool, interval: str):
+    """Manage automatic SSL certificate renewal"""
+    manager = ctx.obj["manager"]
+    
+    if status or (not enable and not disable):
+        # Show current status
+        cron_status = manager.check_auto_renewal_status()
+        if cron_status['enabled']:
+            click.echo("✓ Automatic certificate renewal is ENABLED")
+            click.echo(f"  Schedule: {cron_status['schedule']}")
+            click.echo(f"  Next run: {cron_status.get('next_run', 'Unknown')}")
+        else:
+            click.echo("✗ Automatic certificate renewal is DISABLED")
+        return
+    
+    if enable and disable:
+        click.echo("✗ Cannot enable and disable at the same time")
+        sys.exit(1)
+    
+    if enable:
+        result = manager.setup_auto_renewal(interval)
+        if result['success']:
+            click.echo("✓ Automatic certificate renewal enabled")
+            click.echo(f"  Schedule: {result['schedule']}")
+            click.echo(f"  Command: {result['command']}")
+        else:
+            click.echo(f"✗ Failed to enable auto-renewal: {result['error']}")
+            sys.exit(1)
+    
+    elif disable:
+        result = manager.disable_auto_renewal()
+        if result['success']:
+            click.echo("✓ Automatic certificate renewal disabled")
+        else:
+            click.echo(f"✗ Failed to disable auto-renewal: {result['error']}")
+            sys.exit(1)
 
 
 @cli.command()
@@ -251,10 +298,11 @@ def generate(ctx, no_ssl: bool):
             click.echo("✗ Invalid vhosts configuration format")
             sys.exit(1)
         
-        click.echo("Generating nginx configurations...")
+        click.echo("Analyzing vhost configurations...")
         
-        generated = 0
-        ssl_domains = []  # Track domains that need SSL certificates
+        # First pass: collect all SSL domains that need certificates
+        ssl_domains = []
+        vhost_configs = []
         
         for vhost in vhosts:
             if not isinstance(vhost, dict) or 'name' not in vhost:
@@ -271,36 +319,22 @@ def generate(ctx, no_ssl: bool):
             else:
                 backend = None
             
-            # Generate configuration for primary domain
             if domains:
                 primary_domain = domains[0]
-                try:
-                    config_content = generator.generate_site_config(
-                        domain=primary_domain,
-                        backend=backend,
-                        ssl=ssl
-                    )
-                    
-                    # Write configuration file
-                    config_file = settings.nginx_config_dir / f"{name}.conf"
-                    with open(config_file, 'w', encoding='utf-8') as f:
-                        f.write(config_content)
+                vhost_configs.append({
+                    'name': name,
+                    'domain': primary_domain,
+                    'backend': backend,
+                    'ssl': ssl
+                })
+                
+                # Collect SSL domains for certificate generation
+                if ssl:
+                    ssl_domains.append(primary_domain)
         
-                    click.echo(f"✓ Generated: {config_file}")
-                    generated += 1
-                    
-                    # Track SSL domains for certificate generation
-                    if ssl:
-                        ssl_domains.append(primary_domain)
-                        
-                except Exception as e:
-                    click.echo(f"✗ Failed to generate config for {name}: {e}")
-        
-        click.echo(f"✓ Generated {generated} configuration files")
-        
-        # Generate SSL certificates for domains that need them
+        # Step 1: Generate SSL certificates first (if needed and not skipped)
         if ssl_domains and not no_ssl:
-            click.echo("Generating SSL certificates...")
+            click.echo("Obtaining SSL certificates...")
             ssl_success = 0
             ssl_errors = []
             
@@ -316,19 +350,57 @@ def generate(ctx, no_ssl: bool):
                     ssl_errors.append(error_msg)
             
             if ssl_success > 0:
-                click.echo(f"✓ Generated {ssl_success} SSL certificates")
+                click.echo(f"✓ Obtained {ssl_success} SSL certificates")
             
             if ssl_errors:
                 click.echo("⚠ Some SSL certificates failed:")
                 for error in ssl_errors:
                     click.echo(f"  • {error}")
                 
-                # Don't fail the entire command if only SSL certificates failed
-                click.echo("⚠ You can manually obtain certificates later using the 'renew' command")
+                # Ask user if they want to continue without SSL certificates
+                if not click.confirm("Continue generating configurations without SSL certificates?"):
+                    click.echo("Operation cancelled.")
+                    sys.exit(1)
+                    
+                # Disable SSL for failed domains
+                failed_domains = [error.split(':')[0] for error in ssl_errors]
+                for config in vhost_configs:
+                    if config['domain'] in failed_domains:
+                        config['ssl'] = False
+                        click.echo(f"  Disabled SSL for {config['domain']}")
+        
         elif ssl_domains and no_ssl:
             click.echo(f"⚠ {len(ssl_domains)} domains require SSL certificates but --no-ssl was specified")
-            click.echo("  You can obtain certificates later using the 'renew' command")
-            click.echo(f"  Domains: {', '.join(ssl_domains)}")
+            click.echo("  SSL will be disabled for these domains")
+            # Disable SSL for all configs when --no-ssl is specified
+            for config in vhost_configs:
+                if config['ssl']:
+                    config['ssl'] = False
+        
+        # Step 2: Generate nginx configurations with certificates ready
+        click.echo("Generating nginx configurations...")
+        generated = 0
+        
+        for config in vhost_configs:
+            try:
+                config_content = generator.generate_site_config(
+                    domain=config['domain'],
+                    backend=config['backend'],
+                    ssl=config['ssl']
+                )
+                
+                # Write configuration file
+                config_file = settings.nginx_config_dir / f"{config['name']}.conf"
+                with open(config_file, 'w', encoding='utf-8') as f:
+                    f.write(config_content)
+    
+                click.echo(f"✓ Generated: {config_file}")
+                generated += 1
+                
+            except Exception as e:
+                click.echo(f"✗ Failed to generate config for {config['name']}: {e}")
+        
+        click.echo(f"✓ Generated {generated} configuration files")
         
         # Test configuration
         click.echo("Testing generated configurations...")
@@ -337,6 +409,16 @@ def generate(ctx, no_ssl: bool):
         else:
             click.echo("✗ Some configurations have errors")
             sys.exit(1)
+            
+        # Setup automatic certificate renewal (if SSL certificates were generated)
+        if ssl_domains and not no_ssl:
+            click.echo("Setting up automatic certificate renewal...")
+            renewal_result = manager.setup_auto_renewal('daily')
+            if renewal_result['success']:
+                click.echo("✓ Automatic certificate renewal enabled (daily at 2:00 AM)")
+            else:
+                click.echo(f"⚠ Failed to setup auto-renewal: {renewal_result['error']}")
+                click.echo("  You can set it up manually using: nginx_manager.py auto-renew --enable")
             
     except Exception as e:
         click.echo(f"✗ Failed to generate configurations: {e}")

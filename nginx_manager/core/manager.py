@@ -243,9 +243,20 @@ class NginxManager:
                 result = self.ssl_manager.renew_certificate(domain, force=force)
                 if result['success']:
                     renewed = [domain] if result.get('renewed') else []
+                    
+                    # Reload nginx if certificate was renewed
+                    if result.get('renewed'):
+                        reload_result = self.reload_nginx()
+                        if not reload_result['success']:
+                            return {
+                                'success': False,
+                                'error': f'Certificate renewed but nginx reload failed: {reload_result["error"]}'
+                            }
+                    
                     return {
                         'success': True,
-                        'renewed': renewed
+                        'renewed': renewed,
+                        'nginx_reloaded': result.get('renewed', False)
                     }
                 else:
                     return result
@@ -264,6 +275,16 @@ class NginxManager:
                     elif not result['success']:
                         errors.append(f"{site_domain}: {result['error']}")
                 
+                # Reload nginx if any certificates were renewed
+                nginx_reloaded = False
+                if renewed:
+                    reload_result = self.reload_nginx()
+                    if reload_result['success']:
+                        nginx_reloaded = True
+                    else:
+                        # Add reload error but don't fail the entire operation
+                        errors.append(f"nginx reload failed: {reload_result['error']}")
+                
                 if errors and not renewed:
                     return {
                         'success': False,
@@ -273,7 +294,8 @@ class NginxManager:
                 return {
                     'success': True,
                     'renewed': renewed,
-                    'errors': errors if errors else None
+                    'errors': errors if errors else None,
+                    'nginx_reloaded': nginx_reloaded
                 }
         
         except Exception as e:
@@ -331,4 +353,147 @@ class NginxManager:
             )
             return True
         except subprocess.CalledProcessError:
-            return False 
+            return False
+    
+    def setup_auto_renewal(self, interval: str = 'daily') -> Dict[str, Any]:
+        """Setup automatic certificate renewal using cron"""
+        try:
+            import os
+            import sys
+            from pathlib import Path
+            
+            # Get current script path
+            script_path = Path(sys.argv[0]).resolve()
+            if not script_path.exists():
+                # Fallback to finding nginx_manager.py
+                script_path = Path(__file__).parent.parent.parent / "nginx_manager.py"
+            
+            # Create renewal command
+            venv_python = Path(sys.executable)
+            command = f'cd {script_path.parent} && {venv_python} {script_path} renew --force'
+            
+            # Define cron schedules
+            schedules = {
+                'daily': '0 2 * * *',    # 2 AM daily
+                'weekly': '0 2 * * 0',   # 2 AM every Sunday
+                'monthly': '0 2 1 * *'   # 2 AM on 1st of every month
+            }
+            
+            if interval not in schedules:
+                return {
+                    'success': False,
+                    'error': f'Invalid interval: {interval}'
+                }
+            
+            cron_schedule = schedules[interval]
+            cron_entry = f'{cron_schedule} {command} # nginx-manager auto-renewal'
+            
+            # Add to crontab
+            result = subprocess.run(['crontab', '-l'], capture_output=True, text=True, check=False)
+            current_crontab = result.stdout if result.returncode == 0 else ""
+            
+            # Remove existing nginx-manager entries
+            lines = [line for line in current_crontab.split('\n') 
+                    if line.strip() and '# nginx-manager auto-renewal' not in line]
+            
+            # Add new entry
+            lines.append(cron_entry)
+            new_crontab = '\n'.join(lines) + '\n'
+            
+            # Update crontab
+            proc = subprocess.run(['crontab', '-'], input=new_crontab, text=True, 
+                                capture_output=True, check=True)
+            
+            return {
+                'success': True,
+                'schedule': f'{interval} at 2:00 AM',
+                'command': command,
+                'cron_entry': cron_entry
+            }
+            
+        except subprocess.CalledProcessError as e:
+            return {
+                'success': False,
+                'error': f'Failed to update crontab: {e.stderr or str(e)}'
+            }
+        except Exception as e:
+            return {
+                'success': False,
+                'error': str(e)
+            }
+    
+    def check_auto_renewal_status(self) -> Dict[str, Any]:
+        """Check if automatic renewal is enabled"""
+        try:
+            result = subprocess.run(['crontab', '-l'], capture_output=True, text=True, check=False)
+            if result.returncode != 0:
+                return {'enabled': False}
+            
+            crontab_content = result.stdout
+            nginx_manager_entries = [line for line in crontab_content.split('\n') 
+                                   if '# nginx-manager auto-renewal' in line]
+            
+            if nginx_manager_entries:
+                entry = nginx_manager_entries[0].strip()
+                # Parse cron schedule
+                parts = entry.split()
+                if len(parts) >= 5:
+                    schedule_part = ' '.join(parts[:5])
+                    
+                    # Determine interval from schedule
+                    if schedule_part == '0 2 * * *':
+                        interval = 'daily at 2:00 AM'
+                    elif schedule_part == '0 2 * * 0':
+                        interval = 'weekly on Sunday at 2:00 AM'
+                    elif schedule_part == '0 2 1 * *':
+                        interval = 'monthly on 1st at 2:00 AM'
+                    else:
+                        interval = f'custom: {schedule_part}'
+                    
+                    return {
+                        'enabled': True,
+                        'schedule': interval,
+                        'cron_entry': entry
+                    }
+            
+            return {'enabled': False}
+            
+        except Exception as e:
+            return {
+                'enabled': False,
+                'error': str(e)
+            }
+    
+    def disable_auto_renewal(self) -> Dict[str, Any]:
+        """Disable automatic certificate renewal"""
+        try:
+            result = subprocess.run(['crontab', '-l'], capture_output=True, text=True, check=False)
+            if result.returncode != 0:
+                return {'success': True, 'message': 'No crontab entries found'}
+            
+            current_crontab = result.stdout
+            
+            # Remove nginx-manager entries
+            lines = [line for line in current_crontab.split('\n') 
+                    if line.strip() and '# nginx-manager auto-renewal' not in line]
+            
+            new_crontab = '\n'.join(lines)
+            if new_crontab.strip():
+                new_crontab += '\n'
+            
+            # Update crontab
+            proc = subprocess.run(['crontab', '-'], input=new_crontab, text=True, 
+                                capture_output=True, check=True)
+            
+            return {'success': True}
+            
+        except subprocess.CalledProcessError as e:
+            return {
+                'success': False,
+                'error': f'Failed to update crontab: {e.stderr or str(e)}'
+            }
+        except Exception as e:
+            return {
+                'success': False,
+                'error': str(e)
+            } 
