@@ -65,10 +65,10 @@ def status(ctx, verbose: bool):
     click.echo()
     click.echo("=== Nginx Status ===")
     try:
-        nginx_status = manager.get_nginx_status()
-        click.echo(f"Status: {nginx_status['status']}")
+    nginx_status = manager.get_nginx_status()
+    click.echo(f"Status: {nginx_status['status']}")
         if nginx_status.get("config_test"):
-            click.echo(f"Config test: {'✓ Pass' if nginx_status['config_test'] else '✗ Fail'}")
+        click.echo(f"Config test: {'✓ Pass' if nginx_status['config_test'] else '✗ Fail'}")
             
         # Show verbose information if requested
         if verbose:
@@ -124,13 +124,13 @@ def add(ctx, domain: str, backend: Optional[str], no_ssl: bool, force: bool):
     
     result = manager.add_site(domain=domain, backend=backend, ssl=ssl, force=force)
         
-    if result['success']:
+        if result['success']:
         click.echo("✓ Site added successfully")
-        if ssl:
+            if ssl:
             click.echo("✓ SSL certificate obtained")
         click.echo("✓ Nginx configuration reloaded")
-    else:
-        click.echo(f"✗ Failed to add site: {result['error']}")
+        else:
+            click.echo(f"✗ Failed to add site: {result['error']}")
         sys.exit(1)
 
 
@@ -150,12 +150,12 @@ def remove(ctx, domain: str, force: bool):
     click.echo(f"Removing site: {domain}")
     result = manager.remove_site(domain)
         
-    if result['success']:
+        if result['success']:
         click.echo("✓ Site removed successfully")
         click.echo("✓ SSL certificate removed")
         click.echo("✓ Nginx configuration reloaded")
-    else:
-        click.echo(f"✗ Failed to remove site: {result['error']}")
+        else:
+            click.echo(f"✗ Failed to remove site: {result['error']}")
         sys.exit(1)
 
 
@@ -172,25 +172,25 @@ def renew(ctx, domain: Optional[str], force: bool):
     else:
         click.echo("Renewing all certificates...")
     
-    result = manager.renew_certificates(domain=domain, force=force)
+        result = manager.renew_certificates(domain=domain, force=force)
         
-    if result['success']:
-        renewed = result.get('renewed', [])
-        if renewed:
+        if result['success']:
+            renewed = result.get('renewed', [])
+            if renewed:
             click.echo(f"✓ Renewed certificates for: {', '.join(renewed)}")
             if result.get('nginx_reloaded'):
                 click.echo("✓ Nginx configuration reloaded")
-        else:
+            else:
             click.echo("✓ No certificates needed renewal")
         
         if result.get('errors'):
             click.echo("⚠ Some certificates had errors:")
             for error in result['errors']:
                 click.echo(f"  • {error}")
-    else:
-        click.echo(f"✗ Failed to renew certificates: {result['error']}")
-        sys.exit(1)
-
+        else:
+            click.echo(f"✗ Failed to renew certificates: {result['error']}")
+            sys.exit(1)
+            
 
 @cli.command()
 @click.option("--enable", is_flag=True, help="Enable automatic certificate renewal")
@@ -234,7 +234,7 @@ def auto_renew(ctx, enable: bool, disable: bool, status: bool, interval: str):
             click.echo("✓ Automatic certificate renewal disabled")
         else:
             click.echo(f"✗ Failed to disable auto-renewal: {result['error']}")
-            sys.exit(1)
+        sys.exit(1)
 
 
 @cli.command()
@@ -244,13 +244,13 @@ def reload(ctx):
     manager = ctx.obj["manager"]
     
     click.echo("Reloading nginx configuration...")
-    result = manager.reload_nginx()
+        result = manager.reload_nginx()
         
-    if result['success']:
-        click.echo("✓ Nginx configuration reloaded successfully")
-    else:
-        click.echo(f"✗ Failed to reload nginx: {result['error']}")
-        sys.exit(1)
+        if result['success']:
+            click.echo("✓ Nginx configuration reloaded successfully")
+        else:
+            click.echo(f"✗ Failed to reload nginx: {result['error']}")
+            sys.exit(1)
             
 
 @cli.command()
@@ -286,7 +286,7 @@ def generate(ctx, no_ssl: bool, auto_confirm: bool):
         vhosts_file = settings.config_dir / "vhosts.yml"
         if not vhosts_file.exists():
             click.echo(f"✗ Configuration file not found: {vhosts_file}")
-            sys.exit(1)
+                sys.exit(1)
         
         import yaml
         with open(vhosts_file, 'r', encoding='utf-8') as f:
@@ -297,7 +297,7 @@ def generate(ctx, no_ssl: bool, auto_confirm: bool):
         
         if not isinstance(vhosts, list):
             click.echo("✗ Invalid vhosts configuration format")
-            sys.exit(1)
+                sys.exit(1)
         
         click.echo("Analyzing vhost configurations...")
         
@@ -363,7 +363,7 @@ def generate(ctx, no_ssl: bool, auto_confirm: bool):
                     # Interactive mode - ask user
                     if not click.confirm("Continue generating configurations without SSL certificates?"):
                         click.echo("Operation cancelled.")
-                        sys.exit(1)
+                sys.exit(1)
                 else:
                     # Non-interactive mode or auto-confirm - auto-continue with warning
                     click.echo("⚠ Continuing without SSL certificates (non-interactive mode)")
@@ -399,7 +399,7 @@ def generate(ctx, no_ssl: bool, auto_confirm: bool):
                 config_file = settings.nginx_config_dir / f"{config['name']}.conf"
                 with open(config_file, 'w', encoding='utf-8') as f:
                     f.write(config_content)
-    
+        
                 click.echo(f"✓ Generated: {config_file}")
                 generated += 1
                 
@@ -444,7 +444,7 @@ def templates(ctx):
     if templates_dir.exists():
         for template_file in templates_dir.glob("*.j2"):
             click.echo(f"• {template_file.name}")
-    else:
+        else:
         click.echo("No custom templates found.")
         click.echo(f"Templates directory: {templates_dir}")
 
