@@ -43,14 +43,11 @@ class NginxManager:
         }
         
         try:
-            # Check if nginx is running - try multiple methods
+            # Check if nginx is running
             methods = [
-                # Method 1: Check via pgrep (works in most environments)
-                (['pgrep', 'nginx'], 'pgrep'),
-                # Method 2: Check via systemctl (systemd systems)
-                (['systemctl', 'is-active', 'nginx'], 'systemctl'),
-                # Method 3: Check via service command (sysv systems)
-                (['service', 'nginx', 'status'], 'service')
+                (['pgrep', '-f', 'nginx'], 'pgrep'),
+                (['pidof', 'nginx'], 'pidof'),
+                (['systemctl', 'is-active', 'nginx'], 'systemctl')
             ]
             
             for cmd, method in methods:
@@ -353,7 +350,7 @@ class NginxManager:
             )
             return True
         except subprocess.CalledProcessError:
-            return False
+            return False 
     
     def setup_auto_renewal(self, interval: str = 'daily') -> Dict[str, Any]:
         """Setup automatic certificate renewal using cron"""
