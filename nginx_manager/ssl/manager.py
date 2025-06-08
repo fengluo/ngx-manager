@@ -84,59 +84,113 @@ class SSLManager:
                     'domain': domain
                 }
             
-            # Prepare acme.sh command
-            args = [
-                '--issue',
-                '-d', domain,
-                '--server', self._get_ca_server(),
-            ]
-            
-            # Add challenge method
+            # Use webroot method with nginx document root
             if challenge_method == 'http':
-                # Use webroot method with nginx document root
-                webroot = Path('/var/www/html')
-                try:
-                    if not webroot.exists():
-                        webroot.mkdir(parents=True, exist_ok=True)
-                    args.extend(['--webroot', str(webroot)])
-                except PermissionError:
-                    # Fallback to temp directory if /var/www is not writable
-                    webroot = Path.home() / '.acme.sh' / 'webroot'
-                    webroot.mkdir(parents=True, exist_ok=True)
-                    args.extend(['--webroot', str(webroot)])
+                return self._obtain_with_webroot(domain)
             elif challenge_method == 'dns':
                 # DNS challenge - would need DNS provider specific setup
                 return {
                     'success': False,
                     'error': 'DNS challenge not implemented yet'
                 }
+            else:
+                return {
+                    'success': False,
+                    'error': f'Unsupported challenge method: {challenge_method}'
+                }
+        
+        except Exception as e:
+            return {
+                'success': False,
+                'error': str(e),
+                'domain': domain
+            }
+    
+    def _obtain_with_webroot(self, domain: str) -> Dict[str, Any]:
+        """Obtain certificate using webroot method"""
+        # Ensure nginx webroot directory exists and is accessible
+        webroot = Path('/var/www/html')
+        try:
+            webroot.mkdir(parents=True, exist_ok=True)
+            # Create .well-known/acme-challenge directory
+            acme_challenge_dir = webroot / '.well-known' / 'acme-challenge'
+            acme_challenge_dir.mkdir(parents=True, exist_ok=True)
             
-            # Add email
-            args.extend(['--email', settings.ssl_email])
+            # Test write access
+            test_file = acme_challenge_dir / 'test'
+            test_file.write_text('test')
+            test_file.unlink()
             
-            # Add staging flag if configured
+        except (PermissionError, OSError) as e:
+            # If we can't write to /var/www/html, try alternative approach
+            return self._obtain_with_nginx_reload(domain)
+        
+        # Prepare acme.sh command for webroot mode
+        args = [
+            '--issue',
+            '-d', domain,
+            '--webroot', str(webroot),
+            '--server', self._get_ca_server(),
+            '--email', settings.ssl_email
+        ]
+        
+        # Add staging flag if configured
+        if settings.acme_staging:
+            args.append('--staging')
+        
+        # Run acme.sh
+        result = self._run_acme_command(args, check=False)
+        
+        if result.returncode != 0:
+            # If webroot failed, try with nginx reload method
+            return self._obtain_with_nginx_reload(domain)
+        
+        # Install certificate to our directory
+        install_result = self._install_certificate(domain)
+        if not install_result['success']:
+            return install_result
+        
+        return {
+            'success': True,
+            'domain': domain,
+            'certificate_path': str(self.certs_dir / domain)
+        }
+    
+    def _obtain_with_nginx_reload(self, domain: str) -> Dict[str, Any]:
+        """Obtain certificate by temporarily stopping nginx"""
+        try:
+            # Check if nginx is running
+            nginx_was_running = self._is_nginx_running()
+            
+            if nginx_was_running:
+                # Stop nginx temporarily
+                stop_result = subprocess.run(['nginx', '-s', 'quit'], capture_output=True, text=True)
+                if stop_result.returncode != 0:
+                    # Try kill if graceful stop failed
+                    subprocess.run(['pkill', '-f', 'nginx'], capture_output=True, text=True)
+                
+                # Wait a moment for nginx to stop
+                import time
+                time.sleep(2)
+            
+            # Use standalone mode
+            args = [
+                '--issue',
+                '-d', domain,
+                '--standalone',
+                '--httpport', '80',
+                '--server', self._get_ca_server(),
+                '--email', settings.ssl_email
+            ]
+            
             if settings.acme_staging:
                 args.append('--staging')
             
-            # Run acme.sh
             result = self._run_acme_command(args, check=False)
             
-            if result.returncode != 0:
-                # Try standalone mode if webroot failed
-                if challenge_method == 'http':
-                    args = [
-                        '--issue',
-                        '-d', domain,
-                        '--standalone',
-                        '--httpport', '80',
-                        '--server', self._get_ca_server(),
-                        '--email', settings.ssl_email
-                    ]
-                    
-                    if settings.acme_staging:
-                        args.append('--staging')
-                    
-                    result = self._run_acme_command(args, check=False)
+            # Restart nginx if it was running
+            if nginx_was_running:
+                subprocess.run(['nginx'], capture_output=True, text=True)
             
             if result.returncode != 0:
                 return {
@@ -155,13 +209,24 @@ class SSLManager:
                 'domain': domain,
                 'certificate_path': str(self.certs_dir / domain)
             }
-        
+            
         except Exception as e:
+            # Make sure nginx is restarted even if something goes wrong
+            if nginx_was_running:
+                subprocess.run(['nginx'], capture_output=True, text=True)
             return {
                 'success': False,
-                'error': str(e),
+                'error': f'Failed to obtain certificate with nginx reload: {str(e)}',
                 'domain': domain
             }
+    
+    def _is_nginx_running(self) -> bool:
+        """Check if nginx is currently running"""
+        try:
+            result = subprocess.run(['pgrep', '-f', 'nginx'], capture_output=True, text=True)
+            return result.returncode == 0 and result.stdout.strip()
+        except subprocess.CalledProcessError:
+            return False
     
     def _install_certificate(self, domain: str) -> Dict[str, Any]:
         """Install certificate to our certificates directory"""
