@@ -19,7 +19,7 @@ class Settings:
         
         Args:
             config_dir: Configuration directory path
-                """
+        """
         # Load environment variables from .env file
         try:
             load_dotenv()
@@ -63,22 +63,68 @@ class Settings:
         return config_dir
     
     def _load_config(self) -> Dict[str, Any]:
-        """Load configuration from file"""
+        """Load configuration from unified config.yml file"""
         config = {}
         
         # Load main config file
         if self.config_file.exists():
             with open(self.config_file, 'r', encoding='utf-8') as f:
                 config = yaml.safe_load(f) or {}
-        
-        # Load SSL config if exists
-        ssl_config_file = self.config_dir / "ssl.yml"
-        if ssl_config_file.exists():
-            with open(ssl_config_file, 'r', encoding='utf-8') as f:
-                ssl_config = yaml.safe_load(f) or {}
-                config.update(ssl_config)
+        else:
+            # Create default config if it doesn't exist
+            self._create_default_config()
+            with open(self.config_file, 'r', encoding='utf-8') as f:
+                config = yaml.safe_load(f) or {}
         
         return config
+    
+    def _create_default_config(self) -> None:
+        """Create default configuration file"""
+        default_config = {
+            'environment': 'native',
+            'nginx': {
+                'config_dir': str(self._get_default_nginx_config_dir()),
+                'log_dir': '/var/log/nginx'
+            },
+            'ssl': {
+                'certs_dir': str(self.config_dir.parent / 'certs'),
+                'email': 'admin@example.com',
+                'ca_server': 'letsencrypt',
+                'key_length': 2048,
+                'auto_upgrade': True,
+                'staging': False,
+                'force': False,
+                'debug': False,
+                'renewal_check_interval': 24,
+                'renewal_days_before_expiry': 30,
+                'concurrent_cert_limit': 3,
+                'retry_attempts': 3,
+                'retry_interval': 300
+            },
+            'logs': {
+                'dir': str(self.config_dir.parent / 'logs'),
+                'level': 'info'
+            },
+            'service': {
+                'auto_reload': True,
+                'backup_configs': True
+            },
+            'advanced': {
+                'www_dir': '/var/www/html'
+            }
+        }
+        
+        self.config_dir.mkdir(parents=True, exist_ok=True)
+        with open(self.config_file, 'w', encoding='utf-8') as f:
+            yaml.dump(default_config, f, default_flow_style=False, allow_unicode=True)
+    
+    def _get_default_nginx_config_dir(self) -> Path:
+        """Get default nginx configuration directory based on system"""
+        system = platform.system()
+        if system == 'Darwin':  # macOS
+            return Path('/usr/local/etc/nginx/servers')
+        else:  # Linux and other Unix-like systems
+            return Path('/etc/nginx/conf.d')
     
     def get(self, key: str, default: Any = None, use_env: bool = True) -> Any:
         """
@@ -150,7 +196,23 @@ class Settings:
         with open(self.config_file, 'w', encoding='utf-8') as f:
             yaml.dump(self._config, f, default_flow_style=False, allow_unicode=True)
     
-    # Commonly used configuration properties
+    # Environment properties
+    @property
+    def environment(self) -> str:
+        """Get environment type"""
+        return self.get('environment', 'native')
+    
+    @property
+    def is_docker(self) -> bool:
+        """Check if running in Docker environment"""
+        return self.environment == 'docker'
+    
+    @property
+    def is_development(self) -> bool:
+        """Check if in development mode"""
+        return self.environment == 'development'
+    
+    # Nginx configuration properties
     @property
     def nginx_config_dir(self) -> Path:
         """Get nginx configuration directory"""
@@ -160,31 +222,18 @@ class Settings:
             return Path(config_value)
         
         # Auto-detect based on system
-        system = platform.system()
-        if system == 'Darwin':  # macOS
-            return Path('/usr/local/etc/nginx/servers')
-        else:  # Linux and other Unix-like systems
-            return Path('/etc/nginx/conf.d')
+        return self._get_default_nginx_config_dir()
     
+    @property
+    def nginx_log_dir(self) -> Path:
+        """Get nginx log directory"""
+        return Path(self.get('nginx.log_dir', '/var/log/nginx'))
+    
+    # SSL configuration properties
     @property
     def ssl_certs_dir(self) -> Path:
         """Get SSL certificates directory"""
         return Path(self.get('ssl.certs_dir', self.config_dir.parent / 'certs'))
-    
-    @property
-    def logs_dir(self) -> Path:
-        """Get logs directory"""
-        return Path(self.get('logs.dir', self.config_dir.parent / 'logs'))
-    
-    @property
-    def www_dir(self) -> Path:
-        """Get web root directory"""
-        return Path(self.get('www.dir', self.config_dir.parent / 'www'))
-    
-    @property
-    def debug(self) -> bool:
-        """Check if debug mode is enabled"""
-        return self.get('environment.debug', False)
     
     @property
     def ssl_email(self) -> str:
@@ -202,14 +251,94 @@ class Settings:
         self.set('ssl.ca_server', value)
     
     @property
+    def ssl_key_length(self) -> int:
+        """Get SSL key length"""
+        return self.get('ssl.key_length', 2048)
+    
+    @property
+    def ssl_auto_upgrade(self) -> bool:
+        """Check if SSL auto upgrade is enabled"""
+        return self.get('ssl.auto_upgrade', True)
+    
+    # ACME configuration properties
+    @property
     def acme_staging(self) -> bool:
         """Check if using ACME staging environment"""
-        return self.get('acme.staging', False)
+        return self.get('ssl.staging', False)
     
     @acme_staging.setter
     def acme_staging(self, value: bool) -> None:
         """Set ACME staging mode"""
-        self.set('acme.staging', value)
+        self.set('ssl.staging', value)
+    
+    @property
+    def acme_force(self) -> bool:
+        """Check if forcing certificate renewal"""
+        return self.get('ssl.force', False)
+    
+    @property
+    def acme_debug(self) -> bool:
+        """Check if ACME debug mode is enabled"""
+        return self.get('ssl.debug', False)
+    
+    # Logs configuration properties
+    @property
+    def logs_dir(self) -> Path:
+        """Get logs directory"""
+        return Path(self.get('logs.dir', self.config_dir.parent / 'logs'))
+    
+    @property
+    def logs_level(self) -> str:
+        """Get log level"""
+        return self.get('logs.level', 'info')
+    
+    # Service configuration properties
+    @property
+    def service_auto_reload(self) -> bool:
+        """Check if auto reload is enabled"""
+        return self.get('service.auto_reload', True)
+    
+    @property
+    def service_backup_configs(self) -> bool:
+        """Check if config backup is enabled"""
+        return self.get('service.backup_configs', True)
+    
+    # Advanced configuration properties
+    @property
+    def www_dir(self) -> Path:
+        """Get web root directory"""
+        return Path(self.get('advanced.www_dir', '/var/www/html'))
+    
+    @property
+    def renewal_check_interval(self) -> int:
+        """Get renewal check interval in hours"""
+        return self.get('ssl.renewal_check_interval', 24)
+    
+    @property
+    def renewal_days_before_expiry(self) -> int:
+        """Get days before expiry to start renewal"""
+        return self.get('ssl.renewal_days_before_expiry', 30)
+    
+    @property
+    def concurrent_cert_limit(self) -> int:
+        """Get concurrent certificate limit"""
+        return self.get('ssl.concurrent_cert_limit', 3)
+    
+    @property
+    def retry_attempts(self) -> int:
+        """Get retry attempts"""
+        return self.get('ssl.retry_attempts', 3)
+    
+    @property
+    def retry_interval(self) -> int:
+        """Get retry interval in seconds"""
+        return self.get('ssl.retry_interval', 300)
+    
+    # Legacy properties for backward compatibility
+    @property
+    def debug(self) -> bool:
+        """Check if debug mode is enabled (legacy)"""
+        return self.acme_debug or self.is_development
 
 
 # Global settings instance
