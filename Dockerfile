@@ -15,7 +15,7 @@ RUN apk add --no-cache \
     && rm -rf /var/cache/apk/*
 
 # Install acme.sh
-RUN curl https://get.acme.sh | sh -s email=admin@example.com \
+RUN curl https://get.acme.sh | sh -s email=test@gmail.com \
     && ln -s /root/.acme.sh/acme.sh /usr/local/bin/acme.sh
 
 # Create application directory structure
