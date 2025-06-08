@@ -130,7 +130,7 @@ class SSLManager:
             '--issue',
             '-d', domain,
             '--webroot', str(webroot),
-            '--server', self._get_ca_server(),
+            '--server', settings.ssl_ca_server,
             '--email', settings.ssl_email
         ]
         
@@ -179,7 +179,7 @@ class SSLManager:
                 '-d', domain,
                 '--standalone',
                 '--httpport', '80',
-                '--server', self._get_ca_server(),
+                '--server', settings.ssl_ca_server,
                 '--email', settings.ssl_email
             ]
             
@@ -209,7 +209,7 @@ class SSLManager:
                 'domain': domain,
                 'certificate_path': str(self.certs_dir / domain)
             }
-            
+        
         except Exception as e:
             # Make sure nginx is restarted even if something goes wrong
             if nginx_was_running:
@@ -381,26 +381,6 @@ class SSLManager:
             return True
         
         return False
-    
-    def _get_ca_server(self) -> str:
-        """Get CA server URL"""
-        ca_server = settings.ssl_ca_server
-        
-        if ca_server == 'letsencrypt':
-            if settings.acme_staging:
-                return 'https://acme-staging-v02.api.letsencrypt.org/directory'
-            else:
-                return 'https://acme-v02.api.letsencrypt.org/directory'
-        elif ca_server == 'zerossl':
-            return 'https://acme.zerossl.com/v2/DV90'
-        elif ca_server == 'buypass':
-            if settings.acme_staging:
-                return 'https://api.test4.buypass.no/acme/directory'
-            else:
-                return 'https://api.buypass.com/acme/directory'
-        else:
-            # Assume it's a custom server URL
-            return ca_server
     
     def list_certificates(self) -> List[Dict[str, Any]]:
         """List all managed certificates"""
