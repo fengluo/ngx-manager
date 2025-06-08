@@ -65,17 +65,17 @@ def status(ctx, verbose: bool):
     click.echo()
     click.echo("=== Nginx Status ===")
     try:
-    nginx_status = manager.get_nginx_status()
-    click.echo(f"Status: {nginx_status['status']}")
+        nginx_status = manager.get_nginx_status()
+        click.echo(f"Status: {nginx_status['status']}")
         if nginx_status.get("config_test"):
-        click.echo(f"Config test: {'✓ Pass' if nginx_status['config_test'] else '✗ Fail'}")
-            
-        # Show verbose information if requested
-        if verbose:
-            if nginx_status.get("version"):
-                click.echo(f"Version: {nginx_status['version']}")
-            if nginx_status.get("pid"):
-                click.echo(f"PID: {nginx_status['pid']}")
+            click.echo(f"Config test: {'✓ Pass' if nginx_status['config_test'] else '✗ Fail'}")
+                
+            # Show verbose information if requested
+            if verbose:
+                if nginx_status.get("version"):
+                    click.echo(f"Version: {nginx_status['version']}")
+                if nginx_status.get("pid"):
+                    click.echo(f"PID: {nginx_status['pid']}")
     except Exception as e:
         click.echo(f"✗ Error getting nginx status: {e}")
         sys.exit(1)
