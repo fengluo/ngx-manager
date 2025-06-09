@@ -81,7 +81,6 @@ class Settings:
     def _create_default_config(self) -> None:
         """Create default configuration file"""
         default_config = {
-            'environment': 'native',
             'nginx': {
                 'config_dir': str(self._get_default_nginx_config_dir()),
                 'log_dir': '/var/log/nginx'
@@ -195,22 +194,6 @@ class Settings:
         
         with open(self.config_file, 'w', encoding='utf-8') as f:
             yaml.dump(self._config, f, default_flow_style=False, allow_unicode=True)
-    
-    # Environment properties
-    @property
-    def environment(self) -> str:
-        """Get environment type"""
-        return self.get('environment', 'native')
-    
-    @property
-    def is_docker(self) -> bool:
-        """Check if running in Docker environment"""
-        return self.environment == 'docker'
-    
-    @property
-    def is_development(self) -> bool:
-        """Check if in development mode"""
-        return self.environment == 'development'
     
     # Nginx configuration properties
     @property
@@ -338,7 +321,7 @@ class Settings:
     @property
     def debug(self) -> bool:
         """Check if debug mode is enabled (legacy)"""
-        return self.acme_debug or self.is_development
+        return self.acme_debug
 
 
 # Global settings instance
