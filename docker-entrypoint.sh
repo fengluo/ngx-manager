@@ -20,6 +20,30 @@ mkdir -p /var/www/html/.well-known/acme-challenge
 chmod 755 /var/www/html/.well-known/acme-challenge
 chown -R nginx:nginx /var/www/
 
+# Check and create crontab tasks for certificate renewal
+check_and_create_crontab() {
+    echo "Checking existing crontab tasks..."
+    
+    # Check if crontab exists and has acme.sh renewal task
+    if ! crontab -l 2>/dev/null | grep -q "acme.sh.*--cron"; then
+        echo "No acme.sh renewal crontab found, creating default crontab..."
+        
+        # Create default crontab for certificate renewal (daily at 2:30 AM)
+        (crontab -l 2>/dev/null || true; echo "30 2 * * * $ACME_HOME/acme.sh --cron --home $ACME_HOME > /app/logs/acme-cron.log 2>&1") | crontab -
+        
+        echo "Created default crontab task for certificate renewal"
+    else
+        echo "Existing acme.sh crontab task found"
+    fi
+    
+    # Display current crontab
+    echo "Current crontab tasks:"
+    crontab -l 2>/dev/null || echo "No crontab tasks found"
+}
+
+# Check and create crontab tasks
+check_and_create_crontab
+
 # Start dcron for automatic certificate renewal
 crond -b
 
