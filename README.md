@@ -3,513 +3,272 @@
 [![Docker](https://img.shields.io/badge/Docker-20.10+-blue.svg)](https://www.docker.com/)
 [![Python](https://img.shields.io/badge/Python-3.8+-green.svg)](https://www.python.org/)
 [![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Tests](https://img.shields.io/badge/Tests-Passing-brightgreen.svg)](run_tests.py)
 
-A Nginx automation management and configuration tool that supports virtual host configuration, automatic SSL certificate application and management.
+A Docker-based Nginx automation management tool that simplifies virtual host configuration and SSL certificate management.
 
 [🇨🇳 中文文档](README_zh.md)
 
-## 🚀 Features
+## Features
 
-### 🌐 Simplified Virtual Host Configuration
-- Simple configuration files for describing virtual host proxy services
-- Support for domain configuration, API proxy forwarding, and static file access paths
-- Path-based proxy forwarding and static file path configuration
-- Automatic generation of standard Nginx configuration files
+- **Virtual Host Management**: Configure multiple domains and services with simple YAML files
+- **SSL Certificate Automation**: Automatic certificate application and renewal using acme.sh
+- **Flexible Deployment**: Support for pip installation, Docker, and source code deployment
+- **Multiple Proxy Modes**: Support for reverse proxy, static files, and mixed configurations
 
-### ⚙️ Automated Configuration Generation
-- Read configuration files and extract virtual host descriptions
-- Template-based automatic generation of Nginx virtual host configurations
-- Support for multiple proxy modes and static resource services
+## Quick Start
 
-### 🔒 Automatic SSL Certificate Management
-- Integrated [acme.sh](https://github.com/acmesh-official/acme.sh) for automatic SSL certificate application
-- Automatic detection and application of missing certificates on container startup
-- Automatic certificate renewal without manual intervention
-- Support for multiple certificate authorities
+Choose one of the following deployment methods:
 
-### 🛠️ Flexible Manual Operations
-- Manual triggering of virtual host configuration regeneration
-- Manual application or update of SSL certificates for specified domains
-- Support for modifying acme.sh email and certificate provider configuration
-- User-friendly command-line interface
-
-### 📋 Comprehensive Logging
-- Detailed operation log recording
-- Clear error message prompts
-- Real-time certificate application and configuration generation status
-
-## 📋 System Requirements
-
-- Docker 20.10+
-- Docker Compose 2.0+
-- Domain name resolution to server IP (for SSL certificate application)
-
-## 🚀 Quick Start
-
-### 1. Clone the Repository
+### 1. Install via pip (Recommended)
 
 ```bash
-git clone <repository-url>
-cd ngx-manager
+# Install from PyPI
+pip install ngx-manager
+
+# Create configuration directory
+mkdir -p ~/ngx-manager/{config,logs,certs}
 ```
 
-### 2. Start Services
+### 2. Docker Deployment
 
 ```bash
-# Using Python startup script
-python3 start.py
-
-# Or using Docker Compose
-python3 start.py compose-up
-```
-
-### 3. Access Services
-- HTTP: http://localhost
-- HTTPS: https://localhost (if SSL is configured)
-
-### 4. View Logs
-
-```bash
-# View container logs
-python3 start.py logs --follow
-
-# Or use Docker command
-docker logs -f ngx-manager
-```
-
-### 5. Stop Services
-
-```bash
-python3 start.py stop
-```
-
-## 📁 Project Structure
-
-```
-ngx-manager/
-├── Dockerfile                 # Docker image build file
-├── docker-compose.yml         # Docker Compose configuration
-├── start.py                   # Python startup script
-├── README.md                  # Project documentation (English)
-├── README_zh.md              # Project documentation (Chinese)
-├── LICENSE                    # License
-├── .gitignore                 # Git ignore file
-├── config/                    # Configuration files directory
-│   ├── nginx.conf            # Nginx main configuration
-│   ├── vhosts.yml            # Virtual hosts configuration
-│   └── ssl.yml               # SSL certificate configuration
-├── templates/                 # Configuration templates directory
-│   └── vhost.conf.j2         # Virtual host template
-├── scripts/                   # Scripts directory
-│   ├── generate-config.py    # Configuration generation script (Python)
-│   ├── cert_manager.py       # Certificate management script (Python)
-│   └── entrypoint.py         # Container startup script (Python)
-├── examples/                  # Example files
-├── logs/                      # Logs directory (auto-created)
-├── certs/                     # Certificates directory (auto-created)
-├── nginx-conf/                # Generated nginx configs (auto-created)
-└── tests/                     # Test suites
-    ├── unit/                  # Unit tests
-    ├── integration/           # Integration tests
-    └── e2e/                   # End-to-end tests
-```
-
-**Important Directory Explanation**:
-- `nginx-conf/` - **Core functionality directory** containing all generated Nginx virtual host configuration files
-  - Each virtual host generates a corresponding `.conf` file
-  - File naming format: `{vhost-name}.conf`
-  - Mapped to container's `/etc/nginx/conf.d/` directory
-  - Supports real-time viewing, editing, and debugging configurations
-
-## 🔧 Configuration Guide
-
-### Environment-Specific Setup
-
-The project automatically detects your operating system and uses appropriate nginx configuration paths:
-
-- **Linux/Docker**: `/etc/nginx/conf.d`
-- **macOS (Homebrew)**: `/usr/local/etc/nginx/servers`
-
-You can override the auto-detected path by either:
-1. Setting it in `config/config.yml`:
-   ```yaml
-   nginx:
-     config_dir: "/custom/nginx/path"
-   ```
-2. Using environment variable: `export NGINX_MANAGER_NGINX_CONFIG_DIR="/custom/nginx/path"`
-
-### Virtual Host Configuration (vhosts.yml)
-
-Supports two configuration formats:
-
-**Format 1: Complete Format**
-```yaml
-- name: "service-name"
-  domains:
-    - "domain1.com"
-    - "domain2.com"
-  ssl: true|false         # Enable SSL
-  
-  # Simple mode configuration (backward compatible)
-  type: "proxy|static"     # Proxy mode or static file mode
-  upstream: "backend-url"  # Required for proxy mode only
-  root: "static-root-dir"  # Required for static mode only
-  auth_basic: true|false   # Enable basic authentication
-  
-  # Advanced path configuration mode
-  locations:
-    - path: "/path"        # Matching path, supports regex
-      type: "proxy|static" # Processing type for this path
-      
-      # Proxy configuration (when type: proxy)
-      upstream: "backend-service-url"
-      proxy_pass_path: "/rewrite-path"    # Optional: rewrite path
-      proxy_read_timeout: "30s"          # Optional: read timeout
-      proxy_connect_timeout: "5s"        # Optional: connect timeout
-      proxy_send_timeout: "30s"          # Optional: send timeout
-      websocket: true|false               # Optional: WebSocket support
-      
-      # Static file configuration (when type: static)
-      root: "file-root-directory"
-      try_files: "$uri $uri/ /index.html" # Optional: try_files directive
-      expires: "30d"                      # Optional: cache expiration
-      autoindex: true|false               # Optional: directory browsing
-      
-      # Common configuration
-      auth_basic: true|false              # Optional: basic authentication
-      auth_basic_user_file: "auth-file"   # Optional: authentication file
-      custom_config: |                    # Optional: custom Nginx config
-        # Additional location configuration directives
-        add_header X-Custom-Header "value";
-  
-  # Global custom configuration
-  custom_config: |        # Optional: server-level custom config
-    # Additional server configuration directives
-```
-
-**Format 2: Simplified Format (Recommended)**
-```yaml
-# Direct array usage, omitting vhosts key
-- name: "service-name"
-  domains:
-    - "domain1.com"
-    - "domain2.com"
-  ssl: true|false
-  # ... other configuration items same as complete format
-```
-
-### SSL Configuration (ssl.yml)
-
-```yaml
-ssl:
-  email: "certificate-email@example.com"
-  ca_server: "letsencrypt"  # letsencrypt, zerossl, buypass
-  key_length: 2048          # Key length
-  auto_upgrade: true        # Auto upgrade acme.sh
-
-acme:
-  staging: false            # Use staging environment
-  force: false             # Force certificate reapplication
-  debug: false             # Debug mode
-```
-
-### Path Matching Rules
-
-Supports the following path matching patterns:
-
-```yaml
-locations:
-  # Exact match
-  - path: "= /exact"
-    type: "proxy"
-    upstream: "http://service:8080"
-  
-  # Prefix match (default)
-  - path: "/api"
-    type: "proxy"
-    upstream: "http://api:8080"
-  
-  # Regex match
-  - path: "~ ^/files/(.+)\\.(jpg|jpeg|png|gif)$"
-    type: "static"
-    root: "/var/www/images"
-  
-  # Case-insensitive regex match
-  - path: "~* \\.(css|js)$"
-    type: "static"
-    root: "/var/www/assets"
-    expires: "1y"
-  
-  # Priority prefix match
-  - path: "^~ /static"
-    type: "static"
-    root: "/var/www"
-```
-
-## 🎯 Usage Examples
-
-### Docker Deployment
-
-#### Using Makefile (Recommended)
-
-```bash
-# Build Docker image
-make docker-build
-
-# Start container in background
-make docker-start
-
-# View logs
-make docker-logs
-
-# Stop container
-make docker-stop
-
-# Restart container
-make docker-restart
-```
-
-#### Manual Docker Commands
-
-```bash
-# Build Docker image
-docker build -t ngx-manager .
-
-# Run container
+# Pull and run
 docker run -d --name ngx-manager \
   -p 80:80 -p 443:443 \
   -v $(pwd)/config:/app/config \
   -v $(pwd)/logs:/app/logs \
   -v $(pwd)/certs:/app/certs \
-  -v $(pwd)/nginx-conf:/etc/nginx/conf.d \
-  ngx-manager
+  ngx-manager:latest
+```
 
+### 3. Install from Source
+
+```bash
+# Clone repository
+git clone https://github.com/fengluo/ngx-manager.git
+cd ngx-manager
+
+# Install dependencies
+pip install -r requirements.txt
+```
+
+## Configuration
+
+### Virtual Hosts Configuration (`config/vhosts.yml`)
+
+```yaml
+# Simple proxy configuration
+- name: "api-service"
+  domains:
+    - "api.example.com"
+  ssl: true
+  type: "proxy"
+  upstream: "http://backend:8080"
+
+# Static file configuration
+- name: "static-site"
+  domains:
+    - "static.example.com"
+  ssl: true
+  type: "static"
+  root: "/var/www/html"
+
+# Advanced path-based configuration
+- name: "mixed-service"
+  domains:
+    - "app.example.com"
+  ssl: true
+  locations:
+    - path: "/api"
+      type: "proxy"
+      upstream: "http://api-server:8080"
+    - path: "/static"
+      type: "static"
+      root: "/var/www/static"
+    - path: "/"
+      type: "static"
+      root: "/var/www/html"
+      try_files: "$uri $uri/ /index.html"
+```
+
+### Main Configuration (`config/config.yml`)
+
+```yaml
+# Nginx configuration
+nginx:
+  log_dir: "/var/log/nginx"
+
+# SSL certificate configuration
+ssl:
+  certs_dir: "/tmp/certs"
+  email: "your-email@example.com"           # Required: valid email address
+  ca_server: "letsencrypt"                  # letsencrypt, zerossl, buypass
+  key_length: 2048
+  auto_upgrade: true
+  staging: false                            # Use true for testing
+  force: false                              # Force certificate reapplication
+  debug: false                              # Enable debug mode
+  renewal_check_interval: 24                # Hours
+  renewal_days_before_expiry: 30
+  concurrent_cert_limit: 3
+  retry_attempts: 3
+  retry_interval: 300                       # Seconds
+
+# Logging configuration  
+logs:
+  dir: "/tmp/logs"
+  level: "info"                             # debug, info, warning, error
+
+# Service configuration
+service:
+  auto_reload: true                         # Auto reload nginx
+  backup_configs: true                      # Backup config files
+
+# Advanced configuration
+advanced:
+  www_dir: "/var/www/html"                  # Web root directory
+```
+
+### Nginx Configuration (`config/nginx.conf`)
+
+The main nginx configuration file will be automatically generated, but you can customize it if needed.
+
+## Usage
+
+### Command Line Interface
+
+```bash
+
+# Generate configurations
+ngx-manager generate
+
+# Apply SSL certificates
+ngx-manager cert --domain example.com
+
+# Renew all certificates
+ngx-manager renew
+
+# Show status
+ngx-manager status
+
+# View logs
+ngx-manager logs
+```
+
+### Docker Commands
+
+```bash
 # View logs
 docker logs ngx-manager
 
-# Follow logs
-docker logs -f ngx-manager
+# Execute commands inside container
+docker exec ngx-manager ngx-manager status
 
-# Stop container
-docker stop ngx-manager
-
-# Remove container
-docker rm ngx-manager
+# Restart container
+docker restart ngx-manager
 ```
 
-#### Using Docker Compose
+## Development
 
-Create a `docker-compose.yml` file:
-
-```yaml
-version: '3.8'
-services:
-  ngx-manager:
-    build: .
-    container_name: ngx-manager
-    ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - ./config:/app/config
-      - ./logs:/app/logs
-      - ./certs:/app/certs
-      - ./nginx-conf:/etc/nginx/conf.d
-    restart: unless-stopped
-```
-
-Then run:
+### Setup Development Environment
 
 ```bash
-# Start services
-docker-compose up -d
+# Clone repository
+git clone https://github.com/your-repo/ngx-manager.git
+cd ngx-manager
 
-# View logs
-docker-compose logs -f
+# Create virtual environment
+python -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
 
-# Stop services
-docker-compose down
-```
-
-### Container Management
-
-```bash
-# Enter container
-docker exec -it ngx-manager bash
-
-# Manual configuration generation
-docker exec ngx-manager ngx-manager list
-
-# Manual certificate renewal
-docker exec ngx-manager ngx-manager renew
-
-# Reload nginx configuration
-docker exec ngx-manager ngx-manager reload
-```
-
-### Native Installation
-
-For native installation (without Docker), see the [Installation Guide](#-installation).
-
-## 🧪 Testing
-
-The project includes a comprehensive test suite with unit tests, integration tests, and end-to-end tests.
-
-### Quick Setup
-
-```bash
-# Setup development environment
-make setup-dev
-
-# Activate virtual environment
-source .venv/bin/activate
-
-# Run tests
-make test
+# Install development dependencies
+pip install -r requirements-dev.txt
 ```
 
 ### Running Tests
 
 ```bash
 # Run all tests
-make test
+python -m pytest
 
-# Run specific test types
-make test-unit          # Unit tests only
-make test-integration   # Integration tests only
-make test-e2e          # End-to-end tests (requires Docker)
+# Run with coverage
+python -m pytest --cov=nginx_manager
 
-# Run tests with coverage
-make test-coverage
+# Run specific test file
+python -m pytest tests/test_config.py
 
-# Manual pytest usage
-pytest tests/                    # All tests
-pytest tests/unit/              # Unit tests only
-pytest tests/ -m "not slow"    # Skip slow tests
-pytest tests/ -v               # Verbose output
+# Run integration tests (requires Docker)
+python -m pytest tests/integration/
 ```
 
-### Using Standard Virtual Environment
+### Project Structure
 
-If you prefer manual setup:
-
-```bash
-# Create virtual environment
-python3 -m venv .venv
-
-# Activate virtual environment
-source .venv/bin/activate  # Linux/macOS
-# or
-.venv\Scripts\activate     # Windows
-
-# Install development dependencies
-pip install -r requirements-dev.txt
-
-# Run tests
-pytest tests/
+```
+ngx-manager/
+├── nginx_manager/          # Main package
+│   ├── __init__.py
+│   ├── main.py            # CLI entry point
+│   ├── config.py          # Configuration management
+│   ├── generator.py       # Config generation
+│   ├── cert_manager.py    # SSL certificate management
+│   └── templates/         # Jinja2 templates
+├── tests/                 # Test suite
+├── config/                # Configuration files
+├── requirements.txt       # Production dependencies
+├── requirements-dev.txt   # Development dependencies
+├── setup.py              # Package setup
+└── Dockerfile            # Docker build file
 ```
 
-### Test Structure
-- **Unit Tests**: Test individual components in isolation
-- **Integration Tests**: Test component interactions
-- **E2E Tests**: Test complete workflows with Docker
-- **Coverage Reports**: Generate detailed coverage reports
-
-### Dependencies
-
-The project uses unified requirements management:
-- **requirements.txt**: Production dependencies
-- **requirements-dev.txt**: Development dependencies (includes testing tools)
-
-All test dependencies are included in `requirements-dev.txt` - no separate test requirements file is needed.
-
-## 🔍 Troubleshooting
+## Troubleshooting
 
 ### Common Issues
 
-1. **Certificate Application Failure**
-   - Check if domain DNS resolution is correct
-   - Ensure port 80 is accessible
-   - View certificate application logs: `docker exec ngx-manager cat /app/logs/cert.log`
-
-2. **Configuration Generation Failure**
-   - Check configuration file syntax
-   - Ensure template files exist
-   - View configuration generation logs
-
-3. **Nginx Startup Failure**
-   - Check generated configuration file syntax
-   - Confirm upstream service accessibility
-   - View Nginx error logs
+1. **Permission Errors**: Ensure the user has write permissions to config and log directories
+2. **Port Conflicts**: Check if ports 80/443 are already in use
+3. **SSL Certificate Issues**: Verify domain DNS resolution and port 80 accessibility
+4. **Configuration Errors**: Validate YAML syntax and required fields
 
 ### Debug Mode
 
-Enable debug mode for more detailed logs:
+Enable debug logging:
 
 ```bash
-# Modify debug setting in ssl.yml
-acme:
-  debug: true
+# Set environment variable
+export NGINX_MANAGER_DEBUG=1
 
-# Restart container
-docker-compose restart
+# Or modify config.yml
+ssl:
+  debug: true
+logs:
+  level: "debug"
 ```
 
-## 🏗️ Architecture
+## Contributing
 
-### Core Components
-- **Nginx**: High-performance web server and reverse proxy
-- **Python**: Unified scripting language for configuration generation and certificate management
-- **acme.sh**: SSL certificate automatic application and management
-- **Jinja2**: Powerful template engine
-- **Docker**: Containerized deployment
-
-### Design Advantages
-1. **Unified Language**: All components use Python for consistency and maintainability
-2. **Modular Design**: Independent functional modules, easy to extend and maintain
-3. **Configuration-Driven**: Based on YAML configuration files for simplified management
-4. **Automation**: Supports configuration monitoring and automatic certificate renewal
-5. **Containerization**: Docker deployment ensures environment consistency
-
-## 🤝 Contributing
-
-1. Fork the project
-2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
-4. Push to the branch (`git push origin feature/AmazingFeature`)
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
 5. Open a Pull Request
 
 ### Development Guidelines
-- Follow Python PEP 8 style guidelines
-- Write comprehensive tests for new features
-- Update documentation for any user-facing changes
-- Ensure all tests pass before submitting PR
 
-## 📄 License
+- Follow PEP 8 style guidelines
+- Write tests for new features
+- Update documentation for user-facing changes
+- Ensure all tests pass before submitting
+
+## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-## 🙏 Acknowledgments
+## Support
 
-- [Nginx](https://nginx.org/) - High-performance web server
-- [acme.sh](https://github.com/acmesh-official/acme.sh) - ACME protocol client
-- [Let's Encrypt](https://letsencrypt.org/) - Free SSL certificate service
-- [Python](https://www.python.org/) - Programming language
-- [Docker](https://www.docker.com/) - Containerization platform
+- 📖 Documentation: [GitHub Wiki](https://github.com/your-repo/ngx-manager/wiki)
+- 🐛 Issues: [GitHub Issues](https://github.com/your-repo/ngx-manager/issues)
+- 💬 Discussions: [GitHub Discussions](https://github.com/your-repo/ngx-manager/discussions)
 
-## 📞 Support
+## Changelog
 
-If you encounter issues or have suggestions:
-
-1. Check the [Issues](https://github.com/fengluo/ngx-manager/issues) page
-2. Create a new Issue describing the problem
-3. Contact maintainer: your-email@example.com
-
-## 📈 Changelog
-
-See [CHANGELOG.md](CHANGELOG.md) for a detailed history of changes and improvements.
-
----
-
-**Note**: Please thoroughly test configurations before using in production environments and regularly backup important data. 
+See [CHANGELOG.md](CHANGELOG.md) for version history and updates. 
