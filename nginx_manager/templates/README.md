@@ -1,113 +1,106 @@
-# Nginx 配置模板
+# Nginx Configuration Templates
 
-本目录包含用于生成nginx配置的Jinja2模板文件。
+This module provides Jinja2 templates for generating nginx configuration files and initialization templates for the nginx-manager project.
 
-## 模板文件
+## Available Templates
 
-- `proxy_ssl.conf.j2` - HTTPS代理配置模板
-- `static_ssl.conf.j2` - HTTPS静态文件配置模板  
-- `proxy_http.conf.j2` - HTTP代理配置模板
-- `static_http.conf.j2` - HTTP静态文件配置模板
+### Nginx Site Configuration Templates
+- `proxy_ssl.conf.j2` - SSL-enabled reverse proxy configuration
+- `proxy_http.conf.j2` - HTTP-only reverse proxy configuration  
+- `static_ssl.conf.j2` - SSL-enabled static file serving configuration
+- `static_http.conf.j2` - HTTP-only static file serving configuration
 
-## 使用方法
+### Configuration File Templates
+- `config.yml.j2` - Main configuration file template for nginx-manager
+- `vhosts.yml.j2` - Virtual hosts configuration template with examples
 
-### 基本使用
+## Usage
+
+### ConfigGenerator Class
+
+The `ConfigGenerator` class provides methods to generate various types of configurations:
 
 ```python
-from nginx_manager.templates.generator import ConfigGenerator
+from nginx_manager.templates import ConfigGenerator
 
-# 创建生成器实例
-gen = ConfigGenerator()
+generator = ConfigGenerator()
 
-# 生成HTTPS代理配置
-config = gen.generate_site_config(
-    domain='api.example.com',
-    backend='http://localhost:3000',
+# Generate nginx site configuration
+config_content = generator.generate_site_config(
+    domain="example.com",
+    backend="http://localhost:8080",
     ssl=True
 )
 
-# 生成HTTP静态文件配置
-config = gen.generate_site_config(
-    domain='static.example.com',
-    ssl=False
+# Generate main config.yml file
+config_content = generator.generate_config_file(
+    ssl_email="admin@example.com",
+    ssl_ca_server="letsencrypt",
+    ssl_staging=False,
+    ssl_certs_dir="/app/certs"
+)
+
+# Generate vhosts.yml template file
+vhosts_content = generator.generate_vhosts_file(
+    default_ssl=True,
+    www_dir="/var/www/html"
 )
 ```
 
-### 使用自定义模板
+### Template Variables
 
-```python
-# 使用特定模板文件
-config = gen.generate_site_config(
-    domain='custom.example.com',
-    backend='http://localhost:4000',
-    template_name='custom_proxy.conf.j2'
-)
+#### config.yml.j2 Variables
+- `nginx_log_dir` - Nginx log directory path
+- `ssl_certs_dir` - SSL certificates storage directory
+- `ssl_email` - Email address for SSL certificate registration
+- `ssl_ca_server` - Certificate authority server (letsencrypt, zerossl, buypass)
+- `ssl_staging` - Whether to use staging environment
+- `logs_dir` - Application logs directory
+- `advanced_www_dir` - Web root directory
+- Plus many other SSL and service configuration options
+
+#### vhosts.yml.j2 Variables
+- `default_ssl` - Default SSL setting for example configurations
+- `www_dir` - Web root directory for static file examples
+
+#### Site Configuration Templates Variables
+- `domain` - Primary domain name
+- `backend` - Backend server URL (for proxy configurations)
+- `ssl` - Whether SSL is enabled
+- `ssl_cert_path` - SSL certificate file path
+- `ssl_key_path` - SSL private key file path
+- `access_log` - Access log file path
+- `error_log` - Error log file path
+
+## Template Directory Structure
+
+```
+templates/
+├── __init__.py
+├── generator.py          # ConfigGenerator class
+├── README.md            # This file
+└── templates/           # Jinja2 template files
+    ├── config.yml.j2        # Main config template
+    ├── vhosts.yml.j2        # Vhosts config template
+    ├── proxy_ssl.conf.j2    # SSL proxy site template
+    ├── proxy_http.conf.j2   # HTTP proxy site template
+    ├── static_ssl.conf.j2   # SSL static site template
+    └── static_http.conf.j2  # HTTP static site template
 ```
 
-### 查看可用模板
+## Adding Custom Templates
 
-```python
-# 列出所有可用模板
-templates = gen.list_available_templates()
-print(templates)
+To add custom templates:
 
-# 查看模板内容
-content = gen.get_template_content('proxy_ssl.conf.j2')
-print(content)
-```
+1. Create new `.j2` files in the `templates/` directory
+2. Use Jinja2 syntax for variable substitution
+3. Add corresponding generation methods to `ConfigGenerator` class if needed
+4. Update this README with template variable documentation
 
-## 模板变量
+## Template Inheritance
 
-模板中可以使用以下变量：
+Templates can use Jinja2 inheritance features. Common configuration blocks can be extracted to base templates and extended by specific configuration templates.
 
-- `{{ domain }}` - 域名
-- `{{ backend }}` - 后端服务地址 (仅代理模板)
-- `{{ ssl }}` - 是否启用SSL
-- `{{ ssl_cert_path }}` - SSL证书路径
-- `{{ ssl_key_path }}` - SSL私钥路径
-- `{{ access_log }}` - 访问日志路径
-- `{{ error_log }}` - 错误日志路径
+## Error Handling
 
-## 自定义模板
-
-您可以在 `templates/` 目录中添加自己的模板文件：
-
-1. 创建新的 `.j2` 文件
-2. 使用上述模板变量
-3. 遵循nginx配置语法
-4. 通过 `template_name` 参数使用自定义模板
-
-### 示例自定义模板
-
-```nginx
-# custom_proxy.conf.j2
-server {
-    listen 80;
-    server_name {{ domain }};
-    
-    # 自定义配置
-    client_max_body_size 100M;
-    
-    location / {
-        proxy_pass {{ backend }};
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        
-        # 自定义代理配置
-        proxy_connect_timeout 30s;
-        proxy_send_timeout 60s;
-        proxy_read_timeout 60s;
-    }
-    
-    # 自定义日志
-    access_log {{ access_log }} combined;
-    error_log {{ error_log }} warn;
-}
-```
-
-## 注意事项
-
-- 模板文件必须使用 `.j2` 扩展名
-- 建议在修改模板后测试nginx配置语法
-- SSL模板会自动添加HTTP到HTTPS重定向
-- 所有模板都包含Let's Encrypt challenge支持 
+The `ConfigGenerator` includes proper error handling for missing templates and provides helpful error messages when templates cannot be found or rendered. 

@@ -83,4 +83,46 @@ class ConfigGenerator:
             source, _, _ = self.env.loader.get_source(self.env, template_name)
             return source
         except TemplateNotFound:
-            raise FileNotFoundError(f"Template not found: {template_name}") 
+            raise FileNotFoundError(f"Template not found: {template_name}")
+    
+    def generate_config_file(self, **kwargs) -> str:
+        """Generate config.yml file from template"""
+        template = self.env.get_template("config.yml.j2")
+        
+        # Default configuration values
+        context = {
+            # Nginx configuration
+            'nginx_log_dir': kwargs.get('nginx_log_dir', '/var/log/nginx'),
+            'nginx_logs_level': kwargs.get('nginx_logs_level', 'info'),
+            'nginx_www_dir': kwargs.get('nginx_www_dir', '/var/www/html'),
+            
+            # SSL configuration
+            'ssl_certs_dir': kwargs.get('ssl_certs_dir', '/app/certs'),
+            'ssl_email': kwargs.get('ssl_email', 'admin@example.com'),
+            'ssl_ca_server': kwargs.get('ssl_ca_server', 'letsencrypt'),
+            'ssl_key_length': kwargs.get('ssl_key_length', 2048),
+            'ssl_auto_upgrade': kwargs.get('ssl_auto_upgrade', True),
+            'ssl_staging': kwargs.get('ssl_staging', False),
+            'ssl_force': kwargs.get('ssl_force', False),
+            'ssl_debug': kwargs.get('ssl_debug', False),
+            'ssl_renewal_check_interval': kwargs.get('ssl_renewal_check_interval', 24),
+            'ssl_renewal_days_before_expiry': kwargs.get('ssl_renewal_days_before_expiry', 30),
+            'ssl_concurrent_cert_limit': kwargs.get('ssl_concurrent_cert_limit', 3),
+            'ssl_retry_attempts': kwargs.get('ssl_retry_attempts', 3),
+            'ssl_retry_interval': kwargs.get('ssl_retry_interval', 300),
+            
+        }
+        
+        return template.render(**context)
+    
+    def generate_vhosts_file(self, **kwargs) -> str:
+        """Generate vhosts.yml file from template"""
+        template = self.env.get_template("vhosts.yml.j2")
+        
+        # Default configuration values
+        context = {
+            'default_ssl': kwargs.get('default_ssl', not kwargs.get('ssl_staging', False)),
+            'www_dir': kwargs.get('www_dir', '/var/www/html'),
+        }
+        
+        return template.render(**context) 

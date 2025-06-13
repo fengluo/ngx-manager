@@ -1,0 +1,36 @@
+# 虚拟主机配置示例
+# 更多配置选项请参考文档
+
+# 示例1: 简单代理配置
+- name: "api-example"
+  domains:
+    - "api.example.com"
+  ssl: {{ default_ssl | default(true) | lower }}
+  type: "proxy"
+  upstream: "http://backend:8080"
+
+# 示例2: 静态文件配置  
+- name: "static-example"
+  domains:
+    - "static.example.com"
+  ssl: {{ default_ssl | default(true) | lower }}
+  type: "static"
+  root: "{{ www_dir | default('/var/www/html') }}"
+
+# 示例3: 高级路径配置
+- name: "app-example"
+  domains:
+    - "app.example.com"
+  ssl: {{ default_ssl | default(true) | lower }}
+  locations:
+    - path: "/api"
+      type: "proxy"
+      upstream: "http://api-server:8080"
+    - path: "/static"
+      type: "static"
+      root: "{{ www_dir | default('/var/www') }}/static"
+      expires: "30d"
+    - path: "/"
+      type: "static"
+      root: "{{ www_dir | default('/var/www/html') }}"
+      try_files: "$uri $uri/ /index.html" 

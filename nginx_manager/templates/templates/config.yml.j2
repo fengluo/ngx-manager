@@ -1,0 +1,59 @@
+# Nginx Manager 统一配置文件
+# 本配置文件可以被环境变量覆盖，环境变量格式：NGINX_MANAGER_<KEY>
+
+# Nginx 配置
+nginx:
+  # Nginx配置文件目录（系统自动检测）
+  # - macOS: /usr/local/etc/nginx/servers
+  # - Linux: /etc/nginx/conf.d
+  # 可通过环境变量NGINX_MANAGER_NGINX_CONFIG_DIR覆盖
+  
+  # Nginx日志目录
+  log_dir: "{{ nginx_log_dir }}"
+  
+  # 日志级别 (debug, info, warning, error)
+  log_level: "{{ nginx_logs_level }}"
+
+  www_dir: "{{ advanced_www_dir }}" 
+
+# SSL 证书配置 (统一配置)
+ssl:
+  # 证书存储目录
+  certs_dir: "{{ ssl_certs_dir }}"
+  
+  # 证书申请邮箱 (必须是有效邮箱)
+  email: "{{ ssl_email }}"
+  
+  # CA服务器 ("letsencrypt", "zerossl", "buypass" 或自定义URL)
+  # acme.sh 会自动使用对应的服务器配置
+  ca_server: "{{ ssl_ca_server }}"
+  
+  # 私钥长度
+  key_length: {{ ssl_key_length }}
+  
+  # 自动升级证书
+  auto_upgrade: {{ ssl_auto_upgrade | lower }}
+  
+  # 是否使用测试环境 (生产环境设为 false)
+  staging: {{ ssl_staging | lower }}
+  
+  # 强制重新申请证书
+  force: {{ ssl_force | lower }}
+  
+  # 调试模式
+  debug: {{ ssl_debug | lower }}
+  
+  # 证书更新检查间隔（小时）
+  renewal_check_interval: {{ ssl_renewal_check_interval }}
+  
+  # 证书过期前多少天开始更新
+  renewal_days_before_expiry: {{ ssl_renewal_days_before_expiry }}
+  
+  # 并发申请证书数量限制
+  concurrent_cert_limit: {{ ssl_concurrent_cert_limit }}
+  
+  # 申请失败重试次数
+  retry_attempts: {{ ssl_retry_attempts }}
+  
+  # 重试间隔（秒）
+  retry_interval: {{ ssl_retry_interval }}
