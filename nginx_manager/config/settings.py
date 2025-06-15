@@ -83,7 +83,8 @@ class Settings:
         default_config = {
             'nginx': {
                 'config_dir': str(self._get_default_nginx_config_dir()),
-                'log_dir': '/var/log/nginx'
+                'log_dir': '/var/log/nginx',
+                'log_level': 'info'
             },
             'ssl': {
                 'certs_dir': str(self.config_dir.parent / 'certs'),
@@ -99,14 +100,6 @@ class Settings:
                 'concurrent_cert_limit': 3,
                 'retry_attempts': 3,
                 'retry_interval': 300
-            },
-            'logs': {
-                'dir': str(self.config_dir.parent / 'logs'),
-                'level': 'info'
-            },
-            'service': {
-                'auto_reload': True,
-                'backup_configs': True
             },
             'advanced': {
                 'www_dir': '/var/www/html'
@@ -268,29 +261,18 @@ class Settings:
     @property
     def logs_dir(self) -> Path:
         """Get logs directory"""
-        return Path(self.get('logs.dir', self.config_dir.parent / 'logs'))
+        return Path(self.get('nginx.log_dir', self.config_dir.parent / 'logs'))
     
     @property
     def logs_level(self) -> str:
         """Get log level"""
-        return self.get('logs.level', 'info')
-    
-    # Service configuration properties
-    @property
-    def service_auto_reload(self) -> bool:
-        """Check if auto reload is enabled"""
-        return self.get('service.auto_reload', True)
-    
-    @property
-    def service_backup_configs(self) -> bool:
-        """Check if config backup is enabled"""
-        return self.get('service.backup_configs', True)
+        return self.get('nginx.log_level', 'info')
     
     # Advanced configuration properties
     @property
     def www_dir(self) -> Path:
         """Get web root directory"""
-        return Path(self.get('advanced.www_dir', '/var/www/html'))
+        return Path(self.get('nginx.www_dir', '/var/www/html'))
     
     @property
     def renewal_check_interval(self) -> int:
