@@ -543,25 +543,6 @@ def generate(ctx, no_ssl: bool, auto_confirm: bool):
         click.echo(f"✗ Failed to generate configurations: {e}")
         sys.exit(1)
 
-
-@cli.command()
-@click.pass_context
-def templates(ctx):
-    """List available nginx configuration templates"""
-    from .templates.generator import ConfigGenerator
-    
-    generator = ConfigGenerator()
-    templates_dir = generator.templates_dir
-    
-    click.echo("=== Available Templates ===")
-    if templates_dir.exists():
-        for template_file in templates_dir.glob("*.j2"):
-            click.echo(f"• {template_file.name}")
-        else:
-            click.echo("No custom templates found.")
-        click.echo(f"Templates directory: {templates_dir}")
-
-
 def main():
     """Main entry point for the CLI"""
     cli()
