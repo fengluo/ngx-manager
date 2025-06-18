@@ -67,8 +67,7 @@ temp/
 *.backup
 
 # Sensitive information in configuration files
-config/production.yml
-config/secrets.yml
+config/*.yml
 
 # acme.sh related
 .acme.sh/
