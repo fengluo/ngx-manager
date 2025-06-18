@@ -114,18 +114,6 @@ def init(ctx, email: Optional[str], ca_server: str, staging: bool,
         email = click.prompt("Enter email address for SSL certificates", 
                            default="admin@example.com")
     
-    # Set default directories based on environment
-    default_certs_dir = certs_dir or "/app/certs"
-    default_logs_dir = logs_dir or "/app/logs"  
-    default_www_dir = www_dir or "/var/www/html"
-    
-    # Auto-detect if running on macOS for different defaults
-    import platform
-    if platform.system() == "Darwin":  # macOS
-        default_certs_dir = certs_dir or str(Path.home() / ".nginx-manager" / "certs")
-        default_logs_dir = logs_dir or str(Path.home() / ".nginx-manager" / "logs")
-        default_www_dir = www_dir or "/usr/local/var/www"
-    
     # Generate configuration files using templates
     try:
         from .templates.generator import ConfigGenerator
@@ -133,18 +121,19 @@ def init(ctx, email: Optional[str], ca_server: str, staging: bool,
         
         # Generate config.yml content using template
         config_content = generator.generate_config_file(
-            ssl_certs_dir=default_certs_dir,
+            ssl_certs_dir=ctx.obj['settings'].ssl_certs_dir,
             ssl_email=email,
             ssl_ca_server=ca_server,
             ssl_staging=staging,
             nginx_logs_level="info",
-            advanced_www_dir=default_www_dir,
+            nginx_log_dir=ctx.obj['settings'].nginx_log_dir,
+            advanced_www_dir=ctx.obj['settings'].nginx_www_dir,
         )
         
         # Generate vhosts.yml content using template
         vhosts_content = generator.generate_vhosts_file(
             default_ssl=not staging,  # If staging, default SSL to false for examples
-            www_dir=default_www_dir,
+            www_dir=ctx.obj['settings'].nginx_www_dir,
         )
         
     except Exception as e:
@@ -166,7 +155,7 @@ def init(ctx, email: Optional[str], ca_server: str, staging: bool,
             click.echo(f"• Vhosts file already exists: {vhosts_file}")
         
         # Create required directories
-        for dir_path in [default_certs_dir, default_logs_dir]:
+        for dir_path in [ctx.obj['settings'].ssl_certs_dir, ctx.obj['settings'].nginx_log_dir]:
             dir_obj = Path(dir_path)
             if not dir_obj.exists():
                 try:
@@ -303,51 +292,6 @@ def renew(ctx, domain: Optional[str], force: bool):
         else:
             click.echo(f"✗ Failed to renew certificates: {result['error']}")
             sys.exit(1)
-            
-
-@cli.command()
-@click.option("--enable", is_flag=True, help="Enable automatic certificate renewal")
-@click.option("--disable", is_flag=True, help="Disable automatic certificate renewal")
-@click.option("--status", is_flag=True, help="Show auto-renewal status")
-@click.option("--interval", default="daily", type=click.Choice(['daily', 'weekly', 'monthly']), 
-              help="Renewal check interval (default: daily)")
-@click.pass_context
-def auto_renew(ctx, enable: bool, disable: bool, status: bool, interval: str):
-    """Manage automatic SSL certificate renewal"""
-    manager = ctx.obj["manager"]
-    
-    if status or (not enable and not disable):
-        # Show current status
-        cron_status = manager.check_auto_renewal_status()
-        if cron_status['enabled']:
-            click.echo("✓ Automatic certificate renewal is ENABLED")
-            click.echo(f"  Schedule: {cron_status['schedule']}")
-            click.echo(f"  Next run: {cron_status.get('next_run', 'Unknown')}")
-        else:
-            click.echo("✗ Automatic certificate renewal is DISABLED")
-        return
-    
-    if enable and disable:
-        click.echo("✗ Cannot enable and disable at the same time")
-        sys.exit(1)
-    
-    if enable:
-        result = manager.setup_auto_renewal(interval)
-        if result['success']:
-            click.echo("✓ Automatic certificate renewal enabled")
-            click.echo(f"  Schedule: {result['schedule']}")
-            click.echo(f"  Command: {result['command']}")
-        else:
-            click.echo(f"✗ Failed to enable auto-renewal: {result['error']}")
-            sys.exit(1)
-    
-    elif disable:
-        result = manager.disable_auto_renewal()
-        if result['success']:
-            click.echo("✓ Automatic certificate renewal disabled")
-        else:
-            click.echo(f"✗ Failed to disable auto-renewal: {result['error']}")
-        sys.exit(1)
 
 
 @cli.command()

@@ -78,16 +78,49 @@ class Settings:
         
         return config
     
+    def _get_default_nginx_config_dir(self) -> Path:
+        """Get default nginx configuration directory based on system"""
+        system = platform.system()
+        if system == 'Darwin':  # macOS
+            return Path('/usr/local/etc/nginx/servers')
+        else:  # Linux and other Unix-like systems
+            return Path('/etc/nginx/conf.d')
+    
+    def _get_default_ssl_certs_dir(self) -> Path:
+        """Get default SSL certificates directory based on system"""
+        system = platform.system()
+        if system == 'Darwin':  # macOS
+            return Path.home() / ".nginx-manager" / "certs"
+        else:  # Linux and other Unix-like systems (including Docker)
+            return Path("/app/certs")
+    
+    def _get_default_logs_dir(self) -> Path:
+        """Get default logs directory based on system"""
+        system = platform.system()
+        if system == 'Darwin':  # macOS
+            return Path.home() / ".nginx-manager" / "logs"
+        else:  # Linux and other Unix-like systems (including Docker)
+            return Path("/app/logs")
+    
+    def _get_default_www_dir(self) -> Path:
+        """Get default www directory based on system"""
+        system = platform.system()
+        if system == 'Darwin':  # macOS
+            return Path("/usr/local/var/www")
+        else:  # Linux and other Unix-like systems
+            return Path("/var/www/html")
+    
     def _create_default_config(self) -> None:
         """Create default configuration file"""
         default_config = {
             'nginx': {
                 'config_dir': str(self._get_default_nginx_config_dir()),
-                'log_dir': '/var/log/nginx',
-                'log_level': 'info'
+                'log_dir': str(self._get_default_logs_dir()),
+                'log_level': 'info',
+                'www_dir': str(self._get_default_www_dir())
             },
             'ssl': {
-                'certs_dir': str(self.config_dir.parent / 'certs'),
+                'certs_dir': str(self._get_default_ssl_certs_dir()),
                 'email': 'admin@example.com',
                 'ca_server': 'letsencrypt',
                 'key_length': 2048,
@@ -100,23 +133,12 @@ class Settings:
                 'concurrent_cert_limit': 3,
                 'retry_attempts': 3,
                 'retry_interval': 300
-            },
-            'advanced': {
-                'www_dir': '/var/www/html'
             }
         }
         
         self.config_dir.mkdir(parents=True, exist_ok=True)
         with open(self.config_file, 'w', encoding='utf-8') as f:
             yaml.dump(default_config, f, default_flow_style=False, allow_unicode=True)
-    
-    def _get_default_nginx_config_dir(self) -> Path:
-        """Get default nginx configuration directory based on system"""
-        system = platform.system()
-        if system == 'Darwin':  # macOS
-            return Path('/usr/local/etc/nginx/servers')
-        else:  # Linux and other Unix-like systems
-            return Path('/etc/nginx/conf.d')
     
     def get(self, key: str, default: Any = None, use_env: bool = True) -> Any:
         """
@@ -209,7 +231,7 @@ class Settings:
     @property
     def ssl_certs_dir(self) -> Path:
         """Get SSL certificates directory"""
-        return Path(self.get('ssl.certs_dir', self.config_dir.parent / 'certs'))
+        return Path(self.get('ssl.certs_dir', str(self._get_default_ssl_certs_dir())))
     
     @property
     def ssl_email(self) -> str:
@@ -261,18 +283,17 @@ class Settings:
     @property
     def logs_dir(self) -> Path:
         """Get logs directory"""
-        return Path(self.get('nginx.log_dir', self.config_dir.parent / 'logs'))
+        return Path(self.get('nginx.log_dir', str(self._get_default_logs_dir())))
     
     @property
     def logs_level(self) -> str:
         """Get log level"""
         return self.get('nginx.log_level', 'info')
     
-    # Advanced configuration properties
     @property
     def www_dir(self) -> Path:
         """Get web root directory"""
-        return Path(self.get('nginx.www_dir', '/var/www/html'))
+        return Path(self.get('nginx.www_dir', str(self._get_default_www_dir())))
     
     @property
     def renewal_check_interval(self) -> int:
