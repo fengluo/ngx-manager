@@ -29,7 +29,7 @@ class NginxManager:
             settings.logs_dir,
             settings.www_dir
         ]
-        
+
         for directory in directories:
             directory.mkdir(parents=True, exist_ok=True)
     
@@ -351,73 +351,6 @@ class NginxManager:
             return True
         except subprocess.CalledProcessError:
             return False 
-    
-    def setup_auto_renewal(self, interval: str = 'daily') -> Dict[str, Any]:
-        """Setup automatic certificate renewal using cron"""
-        try:
-            import os
-            import sys
-            from pathlib import Path
-            
-            # Get current script path
-            script_path = Path(sys.argv[0]).resolve()
-            if not script_path.exists():
-                # Fallback to finding nginx_manager.py
-                script_path = Path(__file__).parent.parent.parent / "nginx_manager.py"
-            
-            # Create renewal command
-            venv_python = Path(sys.executable)
-            command = f'cd {script_path.parent} && {venv_python} {script_path} renew --force'
-            
-            # Define cron schedules
-            schedules = {
-                'daily': '0 2 * * *',    # 2 AM daily
-                'weekly': '0 2 * * 0',   # 2 AM every Sunday
-                'monthly': '0 2 1 * *'   # 2 AM on 1st of every month
-            }
-            
-            if interval not in schedules:
-                return {
-                    'success': False,
-                    'error': f'Invalid interval: {interval}'
-                }
-            
-            cron_schedule = schedules[interval]
-            cron_entry = f'{cron_schedule} {command} # nginx-manager auto-renewal'
-            
-            # Add to crontab
-            result = subprocess.run(['crontab', '-l'], capture_output=True, text=True, check=False)
-            current_crontab = result.stdout if result.returncode == 0 else ""
-            
-            # Remove existing nginx-manager entries
-            lines = [line for line in current_crontab.split('\n') 
-                    if line.strip() and '# nginx-manager auto-renewal' not in line]
-            
-            # Add new entry
-            lines.append(cron_entry)
-            new_crontab = '\n'.join(lines) + '\n'
-            
-            # Update crontab
-            proc = subprocess.run(['crontab', '-'], input=new_crontab, text=True, 
-                                capture_output=True, check=True)
-            
-            return {
-                'success': True,
-                'schedule': f'{interval} at 2:00 AM',
-                'command': command,
-                'cron_entry': cron_entry
-            }
-            
-        except subprocess.CalledProcessError as e:
-            return {
-                'success': False,
-                'error': f'Failed to update crontab: {e.stderr or str(e)}'
-            }
-        except Exception as e:
-            return {
-                'success': False,
-                'error': str(e)
-            }
     
     def check_auto_renewal_status(self) -> Dict[str, Any]:
         """Check if automatic renewal is enabled"""
