@@ -55,7 +55,6 @@ EXPOSE 80 443
 ENV TZ=Asia/Shanghai
 ENV NGINX_RELOAD_SIGNAL=HUP
 ENV ACME_HOME=/root/.acme.sh
-ENV DOCKER_CONTAINER=true
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
